@@ -25,5 +25,30 @@ export class UserController {
     return this.userService.create(createUserDto);
   }
 
+ /**
+   * GET /users
+   * Obtener todos los usuarios
+   */
+  @Get()
+  findAll() {
+    return this.userService.findAll();
+  }
  
+    /**
+   * GET /users/:id
+   * Obtener un usuario por ID
+   */
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.findOne(id);
+  }
+
+   /**
+   * DELETE /users/:id
+   * Eliminar un usuario
+   */
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.remove(id);
+  }
 }
