@@ -36,7 +36,7 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
     // Crear nueva instancia de usuario
-    const user = this.userRepository.create({
+    const user: User = this.userRepository.create({
       ...createUserDto,
       password: hashedPassword,
     });
@@ -65,11 +65,38 @@ export class UserService {
     return user;
   }
 
+   /**
+   * Buscar un usuario por ID sin lanzar excepción
+   * Devuelve null si no existe (lo usa la estrategia JWT)
+   */
+  async findById(id: number): Promise<User | null> {
+    return await this.userRepository.findOneBy({ id });
+  }
+
   /**
-   * Eliminar un usuario
+   * Buscar usuario por email
+   * Incluye la contraseña (solo para autenticación)
+   * Devuelve null si el email no está registrado
+   */
+  async findOneByEmail(email: string): Promise<User | null> {
+    return await this.userRepository.findOne({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+      },
+    });
+  }
+
+ /**
+   * Eliminar un usuario (borrado físico del registro)
    */
   async remove(id: number): Promise<void> {
-    const user = await this.findOne(id);
+    const user: User = await this.findOne(id);
     await this.userRepository.remove(user);
   }
 }

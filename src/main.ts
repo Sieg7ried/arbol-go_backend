@@ -1,12 +1,11 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common/pipes/validation.pipe.js';
 
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule);
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-  });
-    // Configurar ValidationPipe globalmente
+  // Configurar ValidationPipe globalmente
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // Elimina propiedades no definidas en el DTO
@@ -14,6 +13,15 @@ async function bootstrap() {
       transform: true, // Transforma los datos al tipo definido en el DTO
     }),
   );
-  await app.listen(process.env.PORT ?? 3000);
+
+  // Aplicar @Exclude() de class-transformer en todas las respuestas
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+
+  // Habilitar CORS (opcional, para desarrollo con frontend)
+  app.enableCors();
+
+  const port: number = Number(process.env.PORT ?? 3000);
+  await app.listen(port);
+  console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
 }
 void bootstrap();
