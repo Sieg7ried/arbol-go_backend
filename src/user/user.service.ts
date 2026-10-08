@@ -8,10 +8,12 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create_user.dto'
+import { UpdateUserDto } from './dto/update-user.dto';
 
 
 @Injectable()
 export class UserService {
+  private readonly saltRounds = 10;
   constructor(
     // Inyección del repositorio de User
     @InjectRepository(User)
@@ -92,6 +94,36 @@ export class UserService {
     });
   }
 
+   /**
+   * Actualizar un usuario
+   */
+ 
+  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+    const user: User = await this.findOne(id);
+
+    // Si se cambia el email, verificar que no pertenezca a otro usuario
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const emailTaken: boolean = await this.userRepository.existsBy({
+        email: updateUserDto.email,
+      });
+      if (emailTaken) {
+        throw new ConflictException('El email ya está registrado');
+      }
+    }
+
+    // Copia de los cambios para no modificar el DTO recibido
+    const changes: UpdateUserDto = { ...updateUserDto };
+
+    // Si se actualiza la contraseña, encriptarla
+    if (changes.password) {
+      changes.password = await bcrypt.hash(changes.password, this.saltRounds);
+    }
+
+    // Combinar los cambios con la entidad existente
+    this.userRepository.merge(user, changes);
+
+    return await this.userRepository.save(user);
+  }
  /**
    * Eliminar un usuario (borrado físico del registro)
    */
