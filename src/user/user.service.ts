@@ -1,23 +1,24 @@
-import { 
-  Injectable, 
-  ConflictException, 
-  NotFoundException 
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
-import { CreateUserDto } from './dto/create_user.dto'
+import { CreateUserDto } from './dto/create_user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-
 
 @Injectable()
 export class UserService {
+  // Número de rondas de encriptación de bcrypt
   private readonly saltRounds = 10;
+
   constructor(
     // Inyección del repositorio de User
     @InjectRepository(User)
-    private readonly userRepository: Repository <User>,
+    private readonly userRepository: Repository<User>,
   ) {}
 
   /**
@@ -26,16 +27,19 @@ export class UserService {
    */
   async create(createUserDto: CreateUserDto): Promise<User> {
     // Verificar si el email ya existe
-    const existingUser = await this.userRepository.findOne({
-      where: { email: createUserDto.email },
+    const emailTaken: boolean = await this.userRepository.existsBy({
+      email: createUserDto.email,
     });
 
-    if (existingUser) {
+    if (emailTaken) {
       throw new ConflictException('El email ya está registrado');
     }
 
     // Encriptar la contraseña
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const hashedPassword: string = await bcrypt.hash(
+      createUserDto.password,
+      this.saltRounds,
+    );
 
     // Crear nueva instancia de usuario
     const user: User = this.userRepository.create({
@@ -47,27 +51,29 @@ export class UserService {
     return await this.userRepository.save(user);
   }
 
-   /**
+  /**
    * Obtener todos los usuarios
-   * No incluye las contraseñas
+   * No incluye las contraseñas (select: false en la entidad)
    */
-  async findAll(): Promise <User[]> {
+  async findAll(): Promise<User[]> {
     return await this.userRepository.find();
   }
 
-   /**
+  /**
    * Obtener un usuario por ID
+   * Lanza 404 si no existe (para uso en controladores)
    */
-  async findOne(id: number): Promise <User> {
-    const user = await this.userRepository.findOne({ where: { id } });
-    
+  async findOne(id: number): Promise<User> {
+    const user: User | null = await this.userRepository.findOneBy({ id });
+
     if (!user) {
       throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     }
+
     return user;
   }
 
-   /**
+  /**
    * Buscar un usuario por ID sin lanzar excepción
    * Devuelve null si no existe (lo usa la estrategia JWT)
    */
@@ -94,10 +100,9 @@ export class UserService {
     });
   }
 
-   /**
+  /**
    * Actualizar un usuario
    */
- 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user: User = await this.findOne(id);
 
@@ -124,7 +129,8 @@ export class UserService {
 
     return await this.userRepository.save(user);
   }
- /**
+
+  /**
    * Eliminar un usuario (borrado físico del registro)
    */
   async remove(id: number): Promise<void> {
