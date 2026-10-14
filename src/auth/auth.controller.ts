@@ -14,6 +14,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/get-user.decorator';
 import { AuthResponse } from './interfaces/auth-response.interface';
 import { User } from '../user/entities/user.entity';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -43,7 +45,8 @@ export class AuthController {
    * Obtener perfil del usuario autenticado
    * Ruta protegida con JWT
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('coordinator') // Roles permitidos para acceder a esta ruta
   @Get('profile')
   getProfile(@GetUser() user: User): { user: User } {
     return { user };
