@@ -17,7 +17,7 @@ export class Especie {
   @Column({ nullable: false })
   nombreComun: string;
 
-   // Nombre completo de la especie, no puede ser nulo
+   // Nombre cientifico de la especie, no puede ser nulo
   @Column({ nullable: false })
   nombreCientifico: string;
 
@@ -29,9 +29,9 @@ export class Especie {
   @Column({ nullable: false })
   frecuenciaPoda: number;
 
-    // Frecuencia de fertilización de la especie, no puede ser nulo
+    // Frecuencia de abono de la especie, no puede ser nulo
   @Column({ nullable: false })
-  frecuenciaFertilizacion: number;
+  frecuenciaAbono: number;
 
       // Descripción de la especie, puede ser nulo
     @Column({ nullable: true })
