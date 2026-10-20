@@ -28,7 +28,7 @@ export class CreateEspecieDto {
 
   // Validación de descripcion con formato correcto
   @IsString({ message: 'La descripción debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'La descripción es obligatoria' })
+  @IsNotEmpty({ message: 'La descripción no es obligatoria' })
   descripcion: string;
  
 }
