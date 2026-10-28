@@ -6,7 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { EspecieModule } from './especie/especie.module';
 import { EventoAmbientalModule } from './evento-ambiental/evento_ambiental.module';
 import { LogroModule } from './logro/logro.module';
-import { LogroModule } from './logro/logro.module';
+
 
 @Module({
   imports: [
