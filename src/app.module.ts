@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { EspecieModule } from './especie/especie.module';
 import { EventoAmbientalModule } from './evento-ambiental/evento_ambiental.module';
 import { LogroModule } from './logro/logro.module';
+import { ArbolModule } from './arbol/arbol.module';
 
 
 @Module({
@@ -41,6 +42,7 @@ import { LogroModule } from './logro/logro.module';
     EspecieModule,
     EventoAmbientalModule,
     LogroModule,
+    ArbolModule,
   ],
 })
 export class AppModule {}
