@@ -7,6 +7,12 @@ import { EspecieModule } from './especie/especie.module';
 import { EventoAmbientalModule } from './evento-ambiental/evento_ambiental.module';
 import { LogroModule } from './logro/logro.module';
 import { ArbolModule } from './arbol/arbol.module';
+import { CuidadoModule } from './cuidado/cuidado.module';
+import { RecordatorioModule } from './recordatorio/recordatorio.module';
+import { FotografiaModule } from './fotografia/fotografia.module';
+import { HistorialModule } from './historial/historial.module';
+import { UsuarioLogroModule } from './usuario-logro/usuario-logro.module';
+import { PublicacionModule } from './publicacion/publicacion.module';
 
 
 @Module({
@@ -43,6 +49,12 @@ import { ArbolModule } from './arbol/arbol.module';
     EventoAmbientalModule,
     LogroModule,
     ArbolModule,
+    CuidadoModule,
+    RecordatorioModule,
+    FotografiaModule,
+    HistorialModule,
+    UsuarioLogroModule,
+    PublicacionModule,
   ],
 })
 export class AppModule {}
