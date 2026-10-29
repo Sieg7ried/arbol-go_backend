@@ -29,6 +29,31 @@ export class User {
   @Column({ nullable: false })
   fullName: string;
 
+  // Almacena opcionalmente la foto de perfil del usuario.
+  @Column({ nullable: true })
+  foto_perfil: string | null;
+
+  // Almacena el nivel actual del usuario.
+  @Column({
+    type: 'int',
+    default: 1,
+  })
+  nivel: number;
+
+  // Almacena la experiencia acumulada del usuario.
+  @Column({
+    type: 'int',
+    default: 0,
+  })
+  experiencia: number;
+
+  // Almacena los puntos acumulados del usuario.
+  @Column({
+    type: 'int',
+    default: 0,
+  })
+  puntos: number;
+
   // Estado activo del usuario
   @Column({ default: true })
   isActive: boolean;

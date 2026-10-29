@@ -13,6 +13,8 @@ import { FotografiaModule } from './fotografia/fotografia.module';
 import { HistorialModule } from './historial/historial.module';
 import { UsuarioLogroModule } from './usuario-logro/usuario-logro.module';
 import { PublicacionModule } from './publicacion/publicacion.module';
+import { ComentarioModule } from './comentario/comentario.module';
+import { ParticipacionModule } from './participacion/participacion.module';
 
 
 @Module({
@@ -55,6 +57,8 @@ import { PublicacionModule } from './publicacion/publicacion.module';
     HistorialModule,
     UsuarioLogroModule,
     PublicacionModule,
+    ComentarioModule,
+    ParticipacionModule,
   ],
 })
 export class AppModule {}
