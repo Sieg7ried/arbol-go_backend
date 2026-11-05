@@ -36,7 +36,12 @@ export class Fotografia {
   @Column({ name: 'fecha', type: 'date', nullable: false })
   fecha: Date;
 
-  // Almacena una descripción opcional de la fotografía.
-  @Column({ name: 'descripcion', nullable: true })
-  descripcion: string | null;
+  // Almacena una descripción opcional como texto compatible con MySQL.
+  // El tipo explícito evita que TypeORM infiera Object desde una unión nullable.
+  @Column({
+    name: 'descripcion',
+    type: 'text',
+    nullable: true,
+  })
+  descripcion: string;
 }

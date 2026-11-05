@@ -52,7 +52,7 @@ export class Historial {
   })
   diametro: number;
 
-  // Almacena observaciones opcionales sobre el crecimiento.
-  @Column({ name: 'observaciones', nullable: true })
-  observaciones: string | null;
+  // Almacena observaciones opcionales como texto compatible con MySQL.
+  @Column({ name: 'observaciones', type: 'text', nullable: true })
+  observaciones: string;
 }

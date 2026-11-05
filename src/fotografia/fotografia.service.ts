@@ -1,5 +1,9 @@
 // Importa la excepción utilizada cuando no se encuentra un registro.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 // Importa el decorador para inyectar repositorios de TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,6 +21,12 @@ import { UpdateFotografiaDto } from './dto/update-fotografia.dto';
 // Importa la entidad principal del módulo.
 import { Fotografia } from './entities/fotografia.entity';
 
+// Importa el servicio que almacena imágenes fuera de la base de datos.
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+
+// Importa el tipo de archivo recibido por Multer.
+import type { Express } from 'express';
+
 // Declara el servicio que contiene la lógica de negocio de las fotografías.
 @Injectable()
 export class FotografiaService {
@@ -29,10 +39,16 @@ export class FotografiaService {
     // Inyecta el repositorio de árboles.
     @InjectRepository(Arbol)
     private readonly arbolRepository: Repository<Arbol>,
+
+    // Centraliza la subida y la obtención de secure_url.
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   // Crea una fotografía después de validar que exista el árbol relacionado.
-  async create(createFotografiaDto: CreateFotografiaDto): Promise<Fotografia> {
+  async create(
+    createFotografiaDto: CreateFotografiaDto,
+    file: Express.Multer.File,
+  ): Promise<Fotografia> {
     // Busca el árbol asociado a la fotografía.
     const arbol: Arbol | null = await this.arbolRepository.findOneBy({
       id_arbol: createFotografiaDto.id_arbol,
@@ -45,9 +61,13 @@ export class FotografiaService {
       );
     }
 
-    // Separa la FK y la fecha para asignarlas con el formato correcto.
+    // Espera la subida antes de crear la entidad para evitar URLs inválidas.
+    const imageUrl = await this.cloudinaryService.uploadImage(file);
+
+    // Separa la FK, la URL controlada por el cliente y la fecha.
     const {
       id_arbol: _idArbol,
+      url_imagen: _clientUrl,
       fecha,
       ...fotografiaData
     } = createFotografiaDto;
@@ -57,6 +77,7 @@ export class FotografiaService {
       ...fotografiaData,
       id_arbol: arbol.id_arbol,
       arbol,
+      url_imagen: imageUrl,
       fecha: new Date(fecha),
     });
 
@@ -98,6 +119,7 @@ export class FotografiaService {
   async update(
     id: number,
     updateFotografiaDto: UpdateFotografiaDto,
+    file?: Express.Multer.File,
   ): Promise<Fotografia> {
     // Busca la fotografía que se desea actualizar.
     const fotografia: Fotografia = await this.findOne(id);
@@ -109,24 +131,19 @@ export class FotografiaService {
 
     // Comprueba si se solicitó cambiar el árbol relacionado.
     if (updateFotografiaDto.id_arbol !== undefined) {
-      // Busca el nuevo árbol relacionado.
-      const arbol: Arbol | null = await this.arbolRepository.findOneBy({
-        id_arbol: updateFotografiaDto.id_arbol,
-      });
+      // Impide transferir la fotografía a un árbol de otro propietario.
+      throw new ForbiddenException(
+        'No puedes cambiar el árbol propietario de la fotografía',
+      );
+    }
 
-      // Informa si el nuevo árbol no existe.
-      if (!arbol) {
-        throw new NotFoundException(
-          `Árbol con ID ${updateFotografiaDto.id_arbol} no encontrado`,
-        );
-      }
+    // Impide que el cliente sustituya una URL sin pasar por Cloudinary.
+    delete changes.url_imagen;
 
-      // Asigna el árbol validado y actualiza explícitamente la FK.
-      fotografia.arbol = arbol;
-      fotografia.id_arbol = arbol.id_arbol;
-
-      // Evita enviar el identificador como un cambio independiente.
-      delete changes.id_arbol;
+    // Sube una imagen nueva solo cuando se adjuntó un archivo.
+    if (file) {
+      // Espera la promesa externa antes de persistir la nueva URL.
+      changes.url_imagen = await this.cloudinaryService.uploadImage(file);
     }
 
     // Convierte la fecha recibida a una instancia de Date.

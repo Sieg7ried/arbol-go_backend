@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
-import { User } from '../../user/entities/user.entity';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 /**
  * Guard para verificar roles de usuario
@@ -30,7 +30,9 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest<{ user?: User }>();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user?: AuthenticatedUser }>();
 
     // Sin usuario: falta JwtAuthGuard o el token no se envió
     if (!user) {
@@ -38,7 +40,7 @@ export class RolesGuard implements CanActivate {
     }
 
     // Verificar si el usuario tiene alguno de los roles requeridos
-    if (!requiredRoles.includes(user.role)) {
+    if (!requiredRoles.includes(user.role ?? user.rol)) {
       throw new ForbiddenException('No tienes permisos para este recurso');
     }
 

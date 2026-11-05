@@ -30,8 +30,8 @@ export class User {
   fullName: string;
 
   // Almacena opcionalmente la foto de perfil del usuario.
-  @Column({ nullable: true })
-  foto_perfil: string | null;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  foto_perfil: string;
 
   // Almacena el nivel actual del usuario.
   @Column({

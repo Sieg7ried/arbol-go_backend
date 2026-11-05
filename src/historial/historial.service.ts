@@ -17,6 +17,9 @@ import { UpdateHistorialDto } from './dto/update-historial.dto';
 // Importa la entidad principal del módulo.
 import { Historial } from './entities/historial.entity';
 
+// Importa el servicio central de árboles para sincronizar las medidas actuales.
+import { ArbolService } from '../arbol/arbol.service';
+
 // Declara el servicio que contiene la lógica de negocio de los historiales.
 @Injectable()
 export class HistorialService {
@@ -29,6 +32,9 @@ export class HistorialService {
     // Inyecta el repositorio de árboles.
     @InjectRepository(Arbol)
     private readonly arbolRepository: Repository<Arbol>,
+
+    // Permite actualizar la ficha actual del árbol después de guardar la medición.
+    private readonly arbolService: ArbolService,
   ) {}
 
   // Crea un historial después de validar que exista el árbol relacionado.
@@ -60,8 +66,17 @@ export class HistorialService {
       fecha: new Date(fecha),
     });
 
-    // Guarda el historial y devuelve el registro persistido.
-    return await this.historialRepository.save(historial);
+    // Guarda primero la medición histórica para conservar el registro original.
+    const historialGuardado = await this.historialRepository.save(historial);
+
+    // Sincroniza altura y diámetro con la ficha actual del árbol.
+    await this.arbolService.update(arbol.id_arbol, {
+      altura_actual: createHistorialDto.altura,
+      diametro_tronco: createHistorialDto.diametro,
+    });
+
+    // Devuelve el historial después de completar la sincronización inter-servicio.
+    return historialGuardado;
   }
 
   // Obtiene todos los historiales incluyendo el árbol relacionado.
@@ -108,24 +123,10 @@ export class HistorialService {
 
     // Comprueba si se solicitó cambiar el árbol relacionado.
     if (updateHistorialDto.id_arbol !== undefined) {
-      // Busca el nuevo árbol relacionado.
-      const arbol: Arbol | null = await this.arbolRepository.findOneBy({
-        id_arbol: updateHistorialDto.id_arbol,
-      });
-
-      // Informa si el nuevo árbol no existe.
-      if (!arbol) {
-        throw new NotFoundException(
-          `Árbol con ID ${updateHistorialDto.id_arbol} no encontrado`,
-        );
-      }
-
-      // Asigna el árbol validado y actualiza explícitamente la FK.
-      historial.arbol = arbol;
-      historial.id_arbol = arbol.id_arbol;
-
-      // Evita enviar el identificador como un cambio independiente.
-      delete changes.id_arbol;
+      // Impide transferir un historial a un árbol potencialmente ajeno.
+      throw new NotFoundException(
+        'No puedes cambiar el árbol asociado al historial',
+      );
     }
 
     // Convierte la fecha recibida a una instancia de Date.
@@ -139,8 +140,32 @@ export class HistorialService {
       changes as Partial<Historial>,
     );
 
-    // Guarda y devuelve el historial actualizado.
-    return await this.historialRepository.save(historial);
+    // Guarda el historial actualizado antes de sincronizar sus medidas.
+    const historialGuardado = await this.historialRepository.save(historial);
+
+    // Construye solo las medidas realmente proporcionadas en el PATCH.
+    const medidas: Partial<{
+      altura_actual: number;
+      diametro_tronco: number;
+    }> = {};
+
+    // Sincroniza altura cuando el historial trae una nueva medición.
+    if (updateHistorialDto.altura !== undefined) {
+      medidas.altura_actual = updateHistorialDto.altura;
+    }
+
+    // Sincroniza diámetro cuando el historial trae una nueva medición.
+    if (updateHistorialDto.diametro !== undefined) {
+      medidas.diametro_tronco = updateHistorialDto.diametro;
+    }
+
+    // Ejecuta la sincronización inter-servicio solo si hubo medidas nuevas.
+    if (Object.keys(medidas).length > 0) {
+      await this.arbolService.update(historial.id_arbol, medidas);
+    }
+
+    // Devuelve el historial una vez finalizadas ambas persistencias.
+    return historialGuardado;
   }
 
   // Elimina físicamente un historial después de comprobar que existe.

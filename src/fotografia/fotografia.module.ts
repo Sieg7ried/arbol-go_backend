@@ -15,11 +15,15 @@ import { FotografiaService } from './fotografia.service';
 
 // Importa la entidad principal de fotografías.
 import { Fotografia } from './entities/fotografia.entity';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 // Declara la configuración y dependencias del módulo de fotografías.
 @Module({
   // Registra los repositorios que serán inyectados en el servicio.
-  imports: [TypeOrmModule.forFeature([Fotografia, Arbol])],
+  imports: [
+    TypeOrmModule.forFeature([Fotografia, Arbol]),
+    CloudinaryModule,
+  ],
 
   // Registra el controlador que expone los endpoints HTTP.
   controllers: [FotografiaController],

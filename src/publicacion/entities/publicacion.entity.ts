@@ -43,4 +43,12 @@ export class Publicacion {
   // Almacena la URL o ruta de la imagen.
   @Column({ name: 'imagen', nullable: false })
   imagen: string;
+
+  // Indica si la publicación fue reportada y requiere moderación.
+  @Column({ name: 'reportado', default: false })
+  reportado: boolean;
+
+  // Registra cuándo se recibió el reporte para facilitar auditoría.
+  @Column({ name: 'fecha_reporte', type: 'datetime', nullable: true })
+  fecha_reporte: Date | null;
 }

@@ -40,9 +40,14 @@ export class Cuidado {
   @Column({ name: 'fecha_realizada', type: 'date', nullable: true })
   fecha_realizada: Date | null;
 
-  // Almacena observaciones opcionales sobre la actividad.
-  @Column({ name: 'observaciones', nullable: true })
-  observaciones: string | null;
+  // Almacena observaciones opcionales como texto compatible con MySQL.
+  // El tipo explícito evita que TypeORM infiera Object desde una unión nullable.
+  @Column({
+    name: 'observaciones',
+    type: 'text',
+    nullable: true,
+  })
+  observaciones: string;
 
   // Almacena el estado actual del cuidado.
   @Column({ name: 'estado', nullable: false })

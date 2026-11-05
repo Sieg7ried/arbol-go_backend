@@ -15,11 +15,15 @@ import { HistorialService } from './historial.service';
 
 // Importa la entidad principal de historiales.
 import { Historial } from './entities/historial.entity';
+import { ArbolModule } from '../arbol/arbol.module';
 
 // Declara la configuración y dependencias del módulo de historiales.
 @Module({
   // Registra los repositorios que serán inyectados en el servicio.
-  imports: [TypeOrmModule.forFeature([Historial, Arbol])],
+  imports: [
+    TypeOrmModule.forFeature([Historial, Arbol]),
+    ArbolModule,
+  ],
 
   // Registra el controlador que expone los endpoints HTTP.
   controllers: [HistorialController],

@@ -1,5 +1,9 @@
 // Importa la excepción utilizada cuando no se encuentra un registro.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 // Importa el decorador para inyectar repositorios de TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
@@ -135,24 +139,10 @@ export class ComentarioService {
 
     // Comprueba si se solicitó cambiar el usuario relacionado.
     if (updateComentarioDto.id_usuario !== undefined) {
-      // Busca el nuevo usuario relacionado.
-      const usuario: User | null = await this.userRepository.findOneBy({
-        id: updateComentarioDto.id_usuario,
-      });
-
-      // Informa si el nuevo usuario no existe.
-      if (!usuario) {
-        throw new NotFoundException(
-          `Usuario con ID ${updateComentarioDto.id_usuario} no encontrado`,
-        );
-      }
-
-      // Asigna el usuario validado y actualiza explícitamente la FK.
-      comentario.usuario = usuario;
-      comentario.id_usuario = usuario.id;
-
-      // Evita enviar el identificador como un cambio independiente.
-      delete changes.id_usuario;
+      // Impide transferir la autoría del comentario desde el DTO.
+      throw new ForbiddenException(
+        'No puedes cambiar el autor del comentario',
+      );
     }
 
     // Comprueba si se solicitó cambiar la publicación relacionada.
@@ -199,6 +189,35 @@ export class ComentarioService {
     const comentario: Comentario = await this.findOne(id);
 
     // Elimina el comentario de la base de datos.
+    await this.comentarioRepository.remove(comentario);
+  }
+
+  // Marca un comentario para que un administrador pueda revisarlo.
+  async report(id: number): Promise<Comentario> {
+    // Busca el comentario antes de modificar su estado de moderación.
+    const comentario = await this.findOne(id);
+
+    // Registra el reporte y su fecha UTC.
+    comentario.reportado = true;
+    comentario.fecha_reporte = new Date();
+
+    // Persiste el reporte manteniendo intacta la autoría.
+    return await this.comentarioRepository.save(comentario);
+  }
+
+  // Elimina un comentario únicamente cuando existe un reporte.
+  async removeReportedByAdmin(id: number): Promise<void> {
+    // Obtiene el comentario con sus relaciones existentes.
+    const comentario = await this.findOne(id);
+
+    // Impide utilizar la moderación para eliminar comentarios no reportados.
+    if (!comentario.reportado) {
+      throw new ForbiddenException(
+        'Solo pueden moderarse comentarios reportados',
+      );
+    }
+
+    // Elimina el comentario después de validar la condición administrativa.
     await this.comentarioRepository.remove(comentario);
   }
 }

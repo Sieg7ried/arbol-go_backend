@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UserService } from '../../user/user.service';
 import { User } from '../../user/entities/user.entity';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -28,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
    * El payload ya viene decodificado y verificado por Passport
    * Lo que retorna se asigna a request.user
    */
-  async validate(payload: JwtPayload): Promise<User> {
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     const user: User | null = await this.userService.findById(payload.sub);
 
     // El token es válido pero el usuario fue eliminado
@@ -41,6 +42,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    return user;
+    // Expone solo identidad y autorización para reducir datos en request.user.
+    return {
+      id_usuario: user.id,
+      rol: user.role,
+      role: user.role,
+    };
   }
 }

@@ -13,7 +13,7 @@ import { RegisterDto } from '../user/dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/get-user.decorator';
 import { AuthResponse } from './interfaces/auth-response.interface';
-import { User } from '../user/entities/user.entity';
+import type { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 
@@ -48,7 +48,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('coordinator') // Roles permitidos para acceder a esta ruta
   @Get('profile')
-  getProfile(@GetUser() user: User): { user: User } {
+  getProfile(@GetUser() user: AuthenticatedUser): { user: AuthenticatedUser } {
     return { user };
   }
 }

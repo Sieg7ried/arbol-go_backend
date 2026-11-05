@@ -33,8 +33,8 @@ export class Especie {
   @Column({ nullable: false })
   frecuenciaAbono: number;
 
-      // Descripción de la especie, puede ser nulo
-    @Column({ nullable: true })
+      // Descripción opcional de la especie almacenada como texto.
+    @Column({ type: 'text', nullable: true })
     descripcion: string;
 
     // Fecha de creación del registro, se establece automáticamente al crear el registro

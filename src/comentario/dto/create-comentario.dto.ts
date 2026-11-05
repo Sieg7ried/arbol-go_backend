@@ -5,26 +5,31 @@ import {
   IsNumber,
   IsString,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 // Define los datos necesarios para registrar un comentario.
 export class CreateComentarioDto {
   // Valida el identificador del usuario relacionado.
   @IsNumber({}, { message: 'id_usuario debe ser un número' })
   @IsNotEmpty({ message: 'id_usuario es obligatorio' })
+  @ApiProperty({ example: 1 })
   id_usuario: number;
 
   // Valida el identificador de la publicación relacionada.
   @IsNumber({}, { message: 'id_publicacion debe ser un número' })
   @IsNotEmpty({ message: 'id_publicacion es obligatorio' })
+  @ApiProperty({ example: 1 })
   id_publicacion: number;
 
   // Valida el contenido del comentario.
   @IsString({ message: 'comentario debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'comentario es obligatorio' })
+  @ApiProperty({ example: 'Excelente crecimiento.' })
   comentario: string;
 
   // Valida que la fecha tenga un formato válido.
   @IsDateString({}, { message: 'fecha debe tener un formato válido' })
   @IsNotEmpty({ message: 'fecha es obligatoria' })
+  @ApiProperty({ example: '2026-11-04T00:00:00.000Z', format: 'date-time' })
   fecha: string;
 }

@@ -1,5 +1,9 @@
 // Importa las excepciones HTTP utilizadas por el servicio.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 // Importa el decorador para inyectar repositorios de TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
@@ -129,23 +133,10 @@ export class ArbolService {
 
     // Comprueba si se solicitó cambiar el usuario relacionado.
     if (updateArbolDto.id_usuario !== undefined) {
-      // Busca el nuevo usuario relacionado.
-      const usuario: User | null = await this.userRepository.findOneBy({
-        id: updateArbolDto.id_usuario,
-      });
-
-      // Informa si el nuevo usuario no existe.
-      if (!usuario) {
-        throw new NotFoundException(
-          `Usuario con ID ${updateArbolDto.id_usuario} no encontrado`,
-        );
-      }
-
-      // Asigna el usuario validado al árbol.
-      arbol.usuario = usuario;
-
-      // Evita enviar el identificador como una columna independiente.
-      delete changes.id_usuario;
+      // Impide que un propietario transfiera el árbol mediante un DTO manipulable.
+      throw new ForbiddenException(
+        'No puedes cambiar el propietario del árbol',
+      );
     }
 
     // Comprueba si se solicitó cambiar la especie relacionada.

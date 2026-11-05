@@ -1,5 +1,9 @@
 // Importa la excepción utilizada cuando no se encuentra un registro.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 // Importa el decorador para inyectar repositorios de TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
@@ -113,24 +117,10 @@ export class PublicacionService {
 
     // Comprueba si se solicitó cambiar el usuario relacionado.
     if (updatePublicacionDto.id_usuario !== undefined) {
-      // Busca el nuevo usuario relacionado.
-      const usuario: User | null = await this.userRepository.findOneBy({
-        id: updatePublicacionDto.id_usuario,
-      });
-
-      // Informa si el nuevo usuario no existe.
-      if (!usuario) {
-        throw new NotFoundException(
-          `Usuario con ID ${updatePublicacionDto.id_usuario} no encontrado`,
-        );
-      }
-
-      // Asigna el usuario validado y actualiza explícitamente la FK.
-      publicacion.usuario = usuario;
-      publicacion.id_usuario = usuario.id;
-
-      // Evita enviar el identificador como un cambio independiente.
-      delete changes.id_usuario;
+      // Impide transferir la autoría mediante datos controlados por el cliente.
+      throw new ForbiddenException(
+        'No puedes cambiar el autor de la publicación',
+      );
     }
 
     // Convierte la fecha recibida a una instancia de Date.
@@ -154,6 +144,35 @@ export class PublicacionService {
     const publicacion: Publicacion = await this.findOne(id);
 
     // Elimina la publicación de la base de datos.
+    await this.publicacionRepository.remove(publicacion);
+  }
+
+  // Marca una publicación para que un administrador pueda revisarla.
+  async report(id: number): Promise<Publicacion> {
+    // Busca la publicación antes de modificar su estado de moderación.
+    const publicacion = await this.findOne(id);
+
+    // Registra el reporte y la fecha UTC del evento.
+    publicacion.reportado = true;
+    publicacion.fecha_reporte = new Date();
+
+    // Persiste el reporte sin alterar la autoría de la publicación.
+    return await this.publicacionRepository.save(publicacion);
+  }
+
+  // Elimina una publicación únicamente si fue reportada previamente.
+  async removeReportedByAdmin(id: number): Promise<void> {
+    // Obtiene el recurso y sus relaciones mediante el método CRUD existente.
+    const publicacion = await this.findOne(id);
+
+    // Impide que un administrador use la ruta de moderación como borrado general.
+    if (!publicacion.reportado) {
+      throw new ForbiddenException(
+        'Solo pueden moderarse publicaciones reportadas',
+      );
+    }
+
+    // Elimina el recurso después de superar la condición de moderación.
     await this.publicacionRepository.remove(publicacion);
   }
 }

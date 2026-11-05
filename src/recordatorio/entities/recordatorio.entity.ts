@@ -32,9 +32,9 @@ export class Recordatorio {
   @Column({ name: 'titulo', nullable: false })
   titulo: string;
 
-  // Almacena una descripción opcional del recordatorio.
-  @Column({ name: 'descripcion', nullable: true })
-  descripcion: string | null;
+  // Almacena una descripción opcional como texto compatible con MySQL.
+  @Column({ name: 'descripcion', type: 'text', nullable: true })
+  descripcion: string;
 
   // Almacena la fecha programada para el recordatorio.
   @Column({ name: 'fecha', type: 'date', nullable: false })

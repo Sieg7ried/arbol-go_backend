@@ -1,11 +1,15 @@
 // Importa la excepción utilizada cuando no se encuentra un registro.
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 // Importa el decorador para inyectar repositorios de TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
 
 // Importa el repositorio genérico utilizado para consultar y guardar entidades.
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 
 // Importa la entidad Arbol para validar la relación correspondiente.
 import { Arbol } from '../arbol/entities/arbol.entity';
@@ -16,6 +20,15 @@ import { UpdateCuidadoDto } from './dto/update-cuidado.dto';
 
 // Importa la entidad principal del módulo.
 import { Cuidado } from './entities/cuidado.entity';
+
+// Importa el servicio que actualiza la progresión y los logros del propietario.
+import { GamificacionService } from '../gamificacion/gamificacion.service';
+
+// Importa el servicio que crea recordatorios para cuidados programados.
+import { RecordatorioService } from '../recordatorio/recordatorio.service';
+
+// Importa la utilidad de normalización UTC para fechas ISO recibidas.
+import { parseUtcDate } from '../common/fecha.util';
 
 // Declara el servicio que contiene la lógica de negocio de los cuidados.
 @Injectable()
@@ -29,6 +42,15 @@ export class CuidadoService {
     // Inyecta el repositorio de árboles.
     @InjectRepository(Arbol)
     private readonly arbolRepository: Repository<Arbol>,
+
+    // Permite ejecutar el cambio de cuidado y la recompensa de forma atómica.
+    private readonly dataSource: DataSource,
+
+    // Procesa las recompensas cuando el cuidado se completa.
+    private readonly gamificacionService: GamificacionService,
+
+    // Crea recordatorios enlazados al árbol del cuidado.
+    private readonly recordatorioService: RecordatorioService,
   ) {}
 
   // Crea un cuidado después de validar que exista el árbol relacionado.
@@ -58,12 +80,20 @@ export class CuidadoService {
       ...cuidadoData,
       id_arbol: arbol.id_arbol,
       arbol,
-      fecha_programada: new Date(fecha_programada),
-      fecha_realizada: fecha_realizada ? new Date(fecha_realizada) : null,
+      fecha_programada: parseUtcDate(fecha_programada),
+      fecha_realizada: fecha_realizada
+        ? parseUtcDate(fecha_realizada)
+        : null,
     });
 
-    // Guarda el cuidado y devuelve el registro persistido.
-    return await this.cuidadoRepository.save(cuidado);
+    // Guarda el cuidado antes de generar su recordatorio automático.
+    const cuidadoGuardado = await this.cuidadoRepository.save(cuidado);
+
+    // Crea el recordatorio porque fecha_programada es obligatoria.
+    await this.recordatorioService.createForCuidado(cuidadoGuardado);
+
+    // Devuelve el cuidado persistido sin alterar el contrato CRUD.
+    return cuidadoGuardado;
   }
 
   // Obtiene todos los cuidados incluyendo el árbol relacionado.
@@ -82,7 +112,9 @@ export class CuidadoService {
     const cuidado: Cuidado | null = await this.cuidadoRepository.findOne({
       where: { id_cuidado: id },
       relations: {
-        arbol: true,
+        arbol: {
+          usuario: true,
+        },
       },
     });
 
@@ -110,29 +142,15 @@ export class CuidadoService {
 
     // Comprueba si se solicitó cambiar el árbol relacionado.
     if (updateCuidadoDto.id_arbol !== undefined) {
-      // Busca el nuevo árbol relacionado.
-      const arbol: Arbol | null = await this.arbolRepository.findOneBy({
-        id_arbol: updateCuidadoDto.id_arbol,
-      });
-
-      // Informa si el nuevo árbol no existe.
-      if (!arbol) {
-        throw new NotFoundException(
-          `Árbol con ID ${updateCuidadoDto.id_arbol} no encontrado`,
-        );
-      }
-
-      // Asigna el árbol validado y actualiza explícitamente la FK.
-      cuidado.arbol = arbol;
-      cuidado.id_arbol = arbol.id_arbol;
-
-      // Evita enviar el identificador como un cambio independiente.
-      delete changes.id_arbol;
+      // Impide transferir el cuidado a un árbol que podría pertenecer a otro usuario.
+      throw new ForbiddenException(
+        'No puedes cambiar el árbol propietario del cuidado',
+      );
     }
 
     // Convierte la fecha programada a una instancia de Date.
     if (updateCuidadoDto.fecha_programada !== undefined) {
-      changes.fecha_programada = new Date(
+      changes.fecha_programada = parseUtcDate(
         updateCuidadoDto.fecha_programada,
       );
     }
@@ -140,15 +158,71 @@ export class CuidadoService {
     // Convierte la fecha realizada a Date o null cuando corresponde.
     if (updateCuidadoDto.fecha_realizada !== undefined) {
       changes.fecha_realizada = updateCuidadoDto.fecha_realizada
-        ? new Date(updateCuidadoDto.fecha_realizada)
+        ? parseUtcDate(updateCuidadoDto.fecha_realizada)
         : null;
     }
 
     // Aplica los cambios restantes sobre la entidad existente.
     this.cuidadoRepository.merge(cuidado, changes as Partial<Cuidado>);
 
-    // Guarda y devuelve el cuidado actualizado.
-    return await this.cuidadoRepository.save(cuidado);
+    // Determina el estado solicitado después de aplicar los cambios.
+    const estadoSolicitado = cuidado.estado.toLowerCase();
+
+    // Ejecuta el guardado y la recompensa en una transacción única.
+    return await this.dataSource.transaction(
+      async (manager: EntityManager): Promise<Cuidado> => {
+        // Vuelve a leer y bloquea el cuidado para evitar recompensas concurrentes.
+        const cuidadoPersistido = await manager
+          .getRepository(Cuidado)
+          .findOne({
+            where: { id_cuidado: id },
+            relations: {
+              arbol: {
+                usuario: true,
+              },
+            },
+            lock: { mode: 'pessimistic_write' },
+          });
+
+        // Informa si el cuidado fue eliminado durante la actualización.
+        if (!cuidadoPersistido) {
+          throw new NotFoundException(`Cuidado con ID ${id} no encontrado`);
+        }
+
+        // Comprueba la transición usando el estado realmente persistido.
+        const pasaACompletado =
+          cuidadoPersistido.estado.toLowerCase() !== 'completado' &&
+          estadoSolicitado === 'completado';
+
+        // Aplica los cambios preparados sobre la fila bloqueada.
+        manager.getRepository(Cuidado).merge(cuidadoPersistido, cuidado);
+
+        // Guarda el cuidado actualizado dentro de la transacción.
+        const cuidadoGuardado = await manager
+          .getRepository(Cuidado)
+          .save(cuidadoPersistido);
+
+        // Detecta si la fecha programada fue modificada al reprogramar el cuidado.
+        const fueReprogramado =
+          updateCuidadoDto.fecha_programada !== undefined;
+
+        // Crea un nuevo recordatorio para la programación vigente.
+        if (fueReprogramado && cuidadoGuardado.estado !== 'completado') {
+          await this.recordatorioService.createForCuidado(cuidadoGuardado);
+        }
+
+        // Recompensa únicamente la primera transición a completado.
+        if (pasaACompletado) {
+          await this.gamificacionService.procesarCuidadoCompletado(
+            manager,
+            cuidadoGuardado,
+          );
+        }
+
+        // Devuelve el cuidado actualizado al controlador.
+        return cuidadoGuardado;
+      },
+    );
   }
 
   // Elimina físicamente un cuidado después de comprobar que existe.

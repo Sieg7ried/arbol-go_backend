@@ -6,17 +6,20 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // Define los datos necesarios para registrar un cuidado.
 export class CreateCuidadoDto {
   // Valida el identificador del árbol relacionado.
   @IsNumber({}, { message: 'id_arbol debe ser un número' })
   @IsNotEmpty({ message: 'id_arbol es obligatorio' })
+  @ApiProperty({ example: 1, description: 'ID del árbol relacionado.' })
   id_arbol: number;
 
   // Valida el tipo de actividad de cuidado.
   @IsString({ message: 'tipo_cuidado debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'tipo_cuidado es obligatorio' })
+  @ApiProperty({ example: 'Riego' })
   tipo_cuidado: string;
 
   // Valida que la fecha programada tenga un formato válido.
@@ -25,6 +28,7 @@ export class CreateCuidadoDto {
     { message: 'fecha_programada debe tener un formato de fecha válido' },
   )
   @IsNotEmpty({ message: 'fecha_programada es obligatoria' })
+  @ApiProperty({ example: '2026-11-05T14:00:00.000Z', format: 'date-time' })
   fecha_programada: string;
 
   // Permite registrar opcionalmente la fecha en que se realizó el cuidado.
@@ -33,15 +37,18 @@ export class CreateCuidadoDto {
     { message: 'fecha_realizada debe tener un formato de fecha válido' },
   )
   @IsOptional()
+  @ApiPropertyOptional({ example: '2026-11-05T14:30:00.000Z', format: 'date-time' })
   fecha_realizada?: string;
 
   // Permite registrar observaciones adicionales sobre el cuidado.
   @IsString({ message: 'observaciones debe ser una cadena de texto' })
   @IsOptional()
+  @ApiPropertyOptional({ example: 'Se aplicó riego profundo.' })
   observaciones?: string;
 
   // Valida el estado actual del cuidado.
   @IsString({ message: 'estado debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'estado es obligatorio' })
+  @ApiProperty({ example: 'pendiente' })
   estado: string;
 }

@@ -16,10 +16,20 @@ import { CuidadoService } from './cuidado.service';
 // Importa la entidad principal de cuidados.
 import { Cuidado } from './entities/cuidado.entity';
 
+// Importa el módulo que contiene las reglas de gamificación.
+import { GamificacionModule } from '../gamificacion/gamificacion.module';
+
+// Importa el módulo que exporta el servicio de recordatorios.
+import { RecordatorioModule } from '../recordatorio/recordatorio.module';
+
 // Declara la configuración y dependencias del módulo de cuidados.
 @Module({
   // Registra los repositorios que serán inyectados en el servicio.
-  imports: [TypeOrmModule.forFeature([Cuidado, Arbol])],
+  imports: [
+    TypeOrmModule.forFeature([Cuidado, Arbol]),
+    GamificacionModule,
+    RecordatorioModule,
+  ],
 
   // Registra el controlador que expone los endpoints HTTP.
   controllers: [CuidadoController],

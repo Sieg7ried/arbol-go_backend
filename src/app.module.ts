@@ -15,10 +15,18 @@ import { UsuarioLogroModule } from './usuario-logro/usuario-logro.module';
 import { PublicacionModule } from './publicacion/publicacion.module';
 import { ComentarioModule } from './comentario/comentario.module';
 import { ParticipacionModule } from './participacion/participacion.module';
+import { GamificacionModule } from './gamificacion/gamificacion.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TareasModule } from './tareas/tareas.module';
+import { SecurityModule } from './security.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 
 @Module({
   imports: [
+    // Inicializa el scheduler global para habilitar los decoradores Cron.
+    ScheduleModule.forRoot(),
+
     // Configuración de variables de entorno
     // isGlobal: true hace que ConfigService esté disponible en toda la app
     ConfigModule.forRoot({
@@ -59,6 +67,10 @@ import { ParticipacionModule } from './participacion/participacion.module';
     PublicacionModule,
     ComentarioModule,
     ParticipacionModule,
+    GamificacionModule,
+    TareasModule,
+    SecurityModule,
+    CloudinaryModule,
   ],
 })
 export class AppModule {}

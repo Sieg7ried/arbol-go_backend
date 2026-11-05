@@ -49,4 +49,12 @@ export class Comentario {
   // Almacena la fecha asociada al comentario.
   @Column({ name: 'fecha', type: 'date', nullable: false })
   fecha: Date;
+
+  // Indica si el comentario fue reportado para revisión administrativa.
+  @Column({ name: 'reportado', default: false })
+  reportado: boolean;
+
+  // Conserva la fecha UTC en que se recibió el reporte.
+  @Column({ name: 'fecha_reporte', type: 'datetime', nullable: true })
+  fecha_reporte: Date | null;
 }

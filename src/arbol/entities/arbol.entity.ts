@@ -83,8 +83,8 @@ export class Arbol {
   @Column({ name: 'nivel_nutrientes', nullable: false })
   nivel_nutrientes: number;
 
-  // Almacena una descripción opcional del árbol.
-  @Column({ name: 'descripcion', nullable: true })
+  // Almacena una descripción opcional como texto compatible con MySQL.
+  @Column({ name: 'descripcion', type: 'text', nullable: true })
   descripcion: string;
 
   // Almacena la latitud geográfica del árbol con siete decimales.
