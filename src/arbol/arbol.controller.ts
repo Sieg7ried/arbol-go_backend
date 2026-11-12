@@ -25,6 +25,8 @@ import { Arbol } from './entities/arbol.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OwnershipGuard } from '../auth/guards/ownership.guard';
 import { OwnsResource } from '../auth/decorators/owns-resource.decorator';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -43,12 +45,20 @@ export class ArbolController {
 
   // Atiende las solicitudes POST /arbol para crear un árbol.
   @Post()
+  // Ejecuta JwtAuthGuard antes del método y rechaza solicitudes sin JWT válido.
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Crear un árbol' })
   @ApiResponse({ status: 201, description: 'Árbol creado.', type: Arbol })
-  // Recibe los datos validados y devuelve el árbol creado.
-  create(@Body() createArbolDto: CreateArbolDto): Promise<Arbol> {
-    // Delega la creación al servicio.
-    return this.arbolService.create(createArbolDto);
+  // Recibe solo los datos del árbol; id_usuario se obtiene del JWT, no del body.
+  create(
+    @GetUser() usuarioAutenticado: AuthenticatedUser,
+    @Body() createArbolDto: CreateArbolDto,
+  ): Promise<Arbol> {
+    // Toma la identidad que JwtAuthGuard/JwtStrategy validaron y colocaron en request.user.
+    const idUsuario: number = usuarioAutenticado.id_usuario;
+
+    // Envía el ID confiable del token y el DTO al servicio; este asocia y valida al propietario.
+    return this.arbolService.create(idUsuario, createArbolDto);
   }
 
   // Atiende las solicitudes GET /arbol para obtener todos los árboles.

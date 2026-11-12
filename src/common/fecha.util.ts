@@ -20,8 +20,8 @@ export function toUtcDatePart(value: Date): string {
 
 // Obtiene la parte de hora UTC con formato HH:mm:ss para MySQL.
 export function toUtcTimePart(value: Date): string {
-  // Extrae la hora desde la representación ISO UTC.
-  return value.toISOString().slice(11, 19);
+  // Conserva también milisegundos para corresponder con las columnas datetime(3)/time(3).
+  return value.toISOString().slice(11, 23);
 }
 
 // Combina las columnas date y time de MySQL en un instante UTC comparable.

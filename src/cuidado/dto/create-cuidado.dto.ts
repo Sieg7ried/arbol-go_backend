@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -25,7 +26,15 @@ export class CreateCuidadoDto {
   // Valida que la fecha programada tenga un formato válido.
   @IsDateString(
     {},
-    { message: 'fecha_programada debe tener un formato de fecha válido' },
+    { message: 'fecha_programada debe tener un formato ISO válido' },
+  )
+  // Exige hora y zona explícita para poder persistir un instante UTC sin ambigüedad.
+  @Matches(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/,
+    {
+      message:
+        'fecha_programada debe incluir hora y zona horaria (UTC o desplazamiento)',
+    },
   )
   @IsNotEmpty({ message: 'fecha_programada es obligatoria' })
   @ApiProperty({ example: '2026-11-05T14:00:00.000Z', format: 'date-time' })
@@ -34,10 +43,21 @@ export class CreateCuidadoDto {
   // Permite registrar opcionalmente la fecha en que se realizó el cuidado.
   @IsDateString(
     {},
-    { message: 'fecha_realizada debe tener un formato de fecha válido' },
+    { message: 'fecha_realizada debe tener un formato ISO válido' },
+  )
+  // Valida también la zona horaria de la fecha real para evitar horas locales ambiguas.
+  @Matches(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/,
+    {
+      message:
+        'fecha_realizada debe incluir hora y zona horaria (UTC o desplazamiento)',
+    },
   )
   @IsOptional()
-  @ApiPropertyOptional({ example: '2026-11-05T14:30:00.000Z', format: 'date-time' })
+  @ApiPropertyOptional({
+    example: '2026-11-05T14:30:00.000Z',
+    format: 'date-time',
+  })
   fecha_realizada?: string;
 
   // Permite registrar observaciones adicionales sobre el cuidado.

@@ -24,9 +24,10 @@ import {
   OWNERSHIP_RESOURCE_KEY,
   OwnershipResource,
 } from '../decorators/owns-resource.decorator';
-import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
+import { Role } from '../enums/role.enum';
+import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
-// Valida que el usuario autenticado sea dueño del recurso solicitado.
+// Valida propiedad persistida y permite explícitamente la moderación administrativa.
 @Injectable()
 export class OwnershipGuard implements CanActivate {
   // Configura el lector de metadatos y la conexión para consultar propiedad real.
@@ -38,15 +39,12 @@ export class OwnershipGuard implements CanActivate {
     private readonly dataSource: DataSource,
   ) {}
 
-  // Bloquea modificaciones y borrados de recursos pertenecientes a otros usuarios.
+  // Comprueba autenticación y propiedad antes de permitir modificaciones o borrados.
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Obtiene el recurso declarado y los datos ya validados por JwtAuthGuard.
     const resource = this.reflector.getAllAndOverride<
       OwnershipResource | undefined
-    >(OWNERSHIP_RESOURCE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    >(OWNERSHIP_RESOURCE_KEY, [context.getHandler(), context.getClass()]);
     const request = context.switchToHttp().getRequest<{
       params: { id: string };
       user?: AuthenticatedUser;
@@ -58,7 +56,7 @@ export class OwnershipGuard implements CanActivate {
     }
 
     // Rechaza requests que no pasaron autenticación.
-    if (!request.user?.id_usuario) {
+    if (!request.user) {
       throw new ForbiddenException('Usuario autenticado requerido');
     }
 
@@ -76,7 +74,13 @@ export class OwnershipGuard implements CanActivate {
       throw new NotFoundException('Recurso no encontrado');
     }
 
-    // Previene IDOR: un usuario no puede acceder a recursos de otro usuario.
+    // Permite moderación administrativa solo después de comprobar autenticación y existencia.
+    const role = request.user.role ?? request.user.rol;
+    if (role === Role.ADMIN) {
+      return true;
+    }
+
+    // Previene IDOR: cualquier otro usuario solo puede acceder a sus recursos propios.
     if (ownerId !== request.user.id_usuario) {
       throw new ForbiddenException('No tienes permisos sobre este recurso');
     }

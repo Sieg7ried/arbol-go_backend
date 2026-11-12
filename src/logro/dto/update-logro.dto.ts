@@ -1,5 +1,9 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { CreateLogroDto } from './create-logro.dto';
 
-// PartialType hace que todas las propiedades de CreateLogroDto sean opcionales
-export class UpdateLogroDto extends PartialType(CreateLogroDto) {}
+/**
+ * Permite actualizar los datos visibles/recompensa sin cambiar el código lógico único.
+ */
+export class UpdateLogroDto extends PartialType(
+  OmitType(CreateLogroDto, ['codigo'] as const),
+) {}

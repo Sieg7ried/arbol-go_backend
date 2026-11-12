@@ -42,40 +42,40 @@ export class ArbolService {
     private readonly especieRepository: Repository<Especie>,
   ) {}
 
-  // Crea un árbol después de validar que existan su usuario y su especie.
-  async create(createArbolDto: CreateArbolDto): Promise<Arbol> {
-    // Busca el usuario asociado al árbol.
+  // Crea un árbol asignándolo al usuario autenticado y valida su especie relacionada.
+  async create(
+    idUsuario: number,
+    createArbolDto: CreateArbolDto,
+  ): Promise<Arbol> {
+    // Busca al propietario usando exclusivamente el ID verificado que recibió desde el JWT.
     const usuario: User | null = await this.userRepository.findOneBy({
-      id: createArbolDto.id_usuario,
+      id: idUsuario,
     });
 
-    // Informa si el usuario relacionado no existe.
+    // Rechaza la creación si el usuario autenticado ya no existe en la base de datos.
     if (!usuario) {
       throw new NotFoundException(
-        `Usuario con ID ${createArbolDto.id_usuario} no encontrado`,
+        `Usuario con ID ${idUsuario} no encontrado`,
       );
     }
 
-    // Busca la especie asociada al árbol.
+    // Busca la especie relacionada con el árbol; es un catálogo global, no propiedad de un usuario.
     const especie: Especie | null = await this.especieRepository.findOneBy({
       id: createArbolDto.id_especie,
     });
 
-    // Informa si la especie relacionada no existe.
+    // Rechaza la creación si la especie referenciada no existe.
     if (!especie) {
       throw new NotFoundException(
         `Especie con ID ${createArbolDto.id_especie} no encontrada`,
       );
     }
 
-    // Extrae los identificadores para asignar las relaciones mediante sus entidades.
-    const {
-      id_usuario: _idUsuario,
-      id_especie: _idEspecie,
-      ...treeData
-    } = createArbolDto;
+    // Extrae id_especie para guardar la relación mediante la entidad ya validada.
+    const { id_especie: _idEspecie, ...treeData } = createArbolDto;
 
-    // Crea una instancia de árbol con las relaciones validadas.
+    // Asigna la relación de usuario desde el JWT, impidiendo elegir propietario mediante el body.
+    // Asigna también la especie existente que se validó desde el catálogo global.
     const arbol: Arbol = this.arbolRepository.create({
       ...treeData,
       usuario,

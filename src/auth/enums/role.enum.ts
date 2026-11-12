@@ -1,11 +1,11 @@
-// Define los roles válidos para evitar comparaciones de texto inconsistentes.
+// Define los roles canónicos compartidos por autorización y validación de DTOs.
 export enum Role {
-  // Usuario que solo puede operar sobre sus propios recursos.
+  // Usuario estándar, limitado a sus propios recursos.
   USER = 'user',
 
-  // Administrador con permisos de moderación.
+  // Administrador con permisos de moderación y acceso administrativo.
   ADMIN = 'admin',
 
-  // Rol existente conservado para no romper rutas previas.
+  // Coordinador para rutas que requieren explícitamente ese nivel funcional.
   COORDINATOR = 'coordinator',
 }

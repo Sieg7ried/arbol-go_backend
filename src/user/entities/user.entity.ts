@@ -3,70 +3,78 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  Index,
   UpdateDateColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 
-// Decorador @Entity define que esta clase es una entidad de base de datos
+/**
+ * Representa un usuario en persistencia.
+ * La serialización excluye todo por defecto para impedir filtraciones desde
+ * relaciones TypeORM y solo expone id, nombre completo y foto de perfil.
+ */
+@Exclude()
 @Entity('users')
 export class User {
-  // Clave primaria auto-incremental
+  /** Identificador público permitido para reconocer al usuario en relaciones. */
+  @Expose()
   @PrimaryGeneratedColumn()
   id: number;
 
-  // Columna de email única y no nula
+  /** Correo privado: se conserva para autenticación, pero no se serializa desde esta entidad. */
   @Column({ unique: true, nullable: false })
   email: string;
 
-  // Columna de contraseña (se guardará encriptada)
-  // select: false evita que se lea por defecto en las consultas
-  // @Exclude() evita que se envíe en las respuestas HTTP (ver sección 5)
-  @Exclude()
+  /** Contraseña privada: no se selecciona por defecto y tampoco se serializa. */
   @Column({ nullable: false, select: false })
   password: string;
 
-  // Nombre completo del usuario
+  /** Nombre permitido en respuestas como dato básico de autoría. */
+  @Expose()
   @Column({ nullable: false })
   fullName: string;
 
-  // Almacena opcionalmente la foto de perfil del usuario.
+  /** Foto opcional permitida en respuestas para identificar visualmente al usuario. */
+  @Expose()
   @Column({ type: 'varchar', length: 255, nullable: true })
   foto_perfil: string;
 
-  // Almacena el nivel actual del usuario.
-  @Column({
-    type: 'int',
-    default: 1,
-  })
+  /** Progreso interno: queda excluido de las respuestas de relaciones. */
+  @Column({ type: 'int', default: 1 })
   nivel: number;
 
-  // Almacena la experiencia acumulada del usuario.
-  @Column({
-    type: 'int',
-    default: 0,
-  })
+  /** Experiencia interna: queda excluida de las respuestas de relaciones. */
+  @Column({ type: 'int', default: 0 })
   experiencia: number;
 
-  // Almacena los puntos acumulados del usuario.
-  @Column({
-    type: 'int',
-    default: 0,
-  })
+  /** Puntos internos: quedan excluidos de las respuestas de relaciones. */
+  @Column({ type: 'int', default: 0 })
   puntos: number;
 
-  // Estado activo del usuario
+  /** Estado de cuenta privado: no se expone en respuestas públicas. */
   @Column({ default: true })
   isActive: boolean;
 
-  // Rol del usuario (por defecto 'user')
+  /** Rol de autorización privado: no se expone en respuestas públicas. */
   @Column({ default: 'user' })
   role: string;
 
-  // Fecha de creación automática
+  /** Token privado de push: nunca se selecciona ni serializa por defecto. */
+  @Index('UQ_users_fcm_token', { unique: true })
+  @Column({
+    name: 'fcm_token',
+    type: 'varchar',
+    length: 512,
+    nullable: true,
+    select: false,
+  })
+  fcmToken: string | null;
+
+  /** Fecha interna de creación: se excluye por minimización de datos expuestos. */
   @CreateDateColumn()
   createdAt: Date;
 
-  // Fecha de actualización automática
+  /** Fecha interna de actualización: se excluye por minimización de datos expuestos. */
   @UpdateDateColumn()
   updatedAt: Date;
 }

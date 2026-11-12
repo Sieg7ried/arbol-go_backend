@@ -4,11 +4,14 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 // Importa la entidad Arbol para establecer la relación con el árbol.
 import { Arbol } from '../../arbol/entities/arbol.entity';
+import { Recordatorio } from '../../recordatorio/entities/recordatorio.entity';
 
 // Define la tabla cuidado en la base de datos.
 @Entity('cuidado')
@@ -32,12 +35,22 @@ export class Cuidado {
   @Column({ name: 'tipo_cuidado', nullable: false })
   tipo_cuidado: string;
 
-  // Almacena la fecha programada para realizar el cuidado.
-  @Column({ name: 'fecha_programada', type: 'date', nullable: false })
+  // DATETIME(3) conserva la hora; el valor se escribe y lee siguiendo la convención UTC de la aplicación.
+  @Column({
+    name: 'fecha_programada',
+    type: 'datetime',
+    precision: 3,
+    nullable: false,
+  })
   fecha_programada: Date;
 
-  // Almacena opcionalmente la fecha real de realización.
-  @Column({ name: 'fecha_realizada', type: 'date', nullable: true })
+  // Conserva también la hora real de ejecución cuando está disponible.
+  @Column({
+    name: 'fecha_realizada',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
   fecha_realizada: Date | null;
 
   // Almacena observaciones opcionales como texto compatible con MySQL.
@@ -52,4 +65,14 @@ export class Cuidado {
   // Almacena el estado actual del cuidado.
   @Column({ name: 'estado', nullable: false })
   estado: string;
+
+  // Indicador persistente que hace idempotente la recompensa incluso ante reintentos.
+  // Exclude evita revelar al cliente un dato interno del proceso de gamificación.
+  @Exclude()
+  @Column({ name: 'recompensado', type: 'boolean', default: false })
+  recompensado: boolean;
+
+  // Relación inversa: la FK está en Recordatorio y permite cargar recordatorios asociados.
+  @OneToMany(() => Recordatorio, (recordatorio) => recordatorio.cuidado)
+  recordatorios: Recordatorio[];
 }

@@ -1,79 +1,230 @@
-// Importa el decorador para declarar el servicio y el decorador de cronjobs.
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-
-// Importa el decorador para inyectar repositorios TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 
-// Importa el repositorio utilizado por las tareas automáticas.
-import { Repository } from 'typeorm';
-
-// Importa las entidades que serán revisadas y actualizadas.
-import { Arbol } from '../arbol/entities/arbol.entity';
 import { Cuidado } from '../cuidado/entities/cuidado.entity';
+import { Recordatorio } from '../recordatorio/entities/recordatorio.entity';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import {
+  combineUtcDateAndTime,
+  toUtcDatePart,
+  toUtcTimePart,
+} from '../common/fecha.util';
+import {
+  calcularSiguienteOcurrencia,
+  esRepeticionProgramada,
+} from './repeticion.util';
 
-// Importa el servicio que procesa recordatorios pendientes.
-import { RecordatorioService } from '../recordatorio/recordatorio.service';
+const ESTADO_PENDIENTE = 'pendiente';
+const ESTADO_VENCIDO = 'vencido';
+const ESTADO_PENDIENTE_ATENCION = 'pendiente_atencion';
+const ESTADO_PROCESANDO = 'procesando';
+const MINUTOS_LEASE_PROCESAMIENTO = 120;
+const TAMANO_LOTE_RECORDATORIOS = 100;
 
-// Ejecuta las tareas periódicas de recordatorios y cuidados vencidos.
 @Injectable()
 export class TareasService {
-  // Configura repositorios y servicios necesarios para el procesamiento automático.
+  private readonly logger = new Logger(TareasService.name);
+
   constructor(
-    // Permite buscar cuidados pendientes vencidos.
-    @InjectRepository(Cuidado)
-    private readonly cuidadoRepository: Repository<Cuidado>,
+    @InjectRepository(Recordatorio)
+    private readonly recordatorioRepository: Repository<Recordatorio>,
 
-    // Permite actualizar el estado de salud de los árboles.
-    @InjectRepository(Arbol)
-    private readonly arbolRepository: Repository<Arbol>,
-
-    // Permite localizar y marcar recordatorios vencidos.
-    private readonly recordatorioService: RecordatorioService,
+    private readonly dataSource: DataSource,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
-  // Ejecuta el proceso cada hora usando explícitamente la zona UTC.
   @Cron(CronExpression.EVERY_HOUR, {
     name: 'procesar-recordatorios-y-cuidados-vencidos',
     timeZone: 'UTC',
   })
   async procesarTareasAutomaticas(): Promise<void> {
-    // Captura el instante actual como fecha absoluta UTC.
     const ahoraUtc = new Date();
+    const ahoraSql = ahoraUtc.toISOString().replace('T', ' ').replace('Z', '');
 
-    // Busca los recordatorios pendientes cuya fecha ya llegó.
-    const recordatorios = await this.recordatorioService.findPendingDue(
-      ahoraUtc,
-    );
+    // Recupera reclamaciones abandonadas por un reinicio o caída del proceso.
+    // El plazo excede una ejecución normal y evita dejar recordatorios bloqueados indefinidamente.
+    await this.recordatorioRepository
+      .createQueryBuilder()
+      .update(Recordatorio)
+      .set({ estado: ESTADO_PENDIENTE, procesando_desde: null })
+      .where(
+        `estado = :procesando AND procesando_desde <= DATE_SUB(:ahora, INTERVAL ${MINUTOS_LEASE_PROCESAMIENTO} MINUTE)`,
+        {
+          procesando: ESTADO_PROCESANDO,
+          ahora: ahoraSql,
+        },
+      )
+      .execute();
 
-    // Marca cada recordatorio vencido como pendiente de atención.
-    for (const recordatorio of recordatorios) {
-      await this.recordatorioService.markAsDue(recordatorio);
-    }
+    // La base actualiza solo cuidados pendientes cuya fecha programada ya venció.
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .getRepository(Cuidado)
+        .createQueryBuilder()
+        .update(Cuidado)
+        .set({ estado: ESTADO_VENCIDO })
+        .where('estado = :pendiente AND fecha_programada <= :ahora', {
+          pendiente: ESTADO_PENDIENTE,
+          ahora: ahoraSql,
+        })
+        .execute();
 
-    // Busca cuidados pendientes junto con sus árboles relacionados.
-    const cuidadosPendientes = await this.cuidadoRepository.find({
-      where: { estado: 'pendiente' },
-      relations: { arbol: true },
+      // Cambia en bloque la salud de los árboles que tienen un cuidado vencido,
+      // sin materializar entidades de cuidados ni árboles en memoria.
+      await manager.query(
+        'UPDATE `arbol` a INNER JOIN `cuidado` c ON c.`id_arbol` = a.`id_arbol` SET a.`estado_salud` = ? WHERE c.`estado` = ? AND c.`fecha_programada` <= ? AND a.`estado_salud` <> ?',
+        ['requiere_atencion', ESTADO_VENCIDO, ahoraSql, 'requiere_atencion'],
+      );
     });
 
-    // Revisa cada cuidado para detectar incumplimientos.
-    for (const cuidado of cuidadosPendientes) {
-      // Convierte la fecha programada en un instante UTC comparable.
-      const fechaProgramadaUtc = new Date(cuidado.fecha_programada);
+    // Solo se seleccionan recordatorios pendientes ya vencidos y los campos necesarios
+    // para enviar la notificación y calcular su próxima ocurrencia.
+    let ultimoIdProcesado = 0;
+    while (true) {
+      // Lee un lote acotado y pagina por ID para que miles de vencimientos no se hidraten juntos.
+      const recordatoriosVencidos = await this.recordatorioRepository
+        .createQueryBuilder('recordatorio')
+        .select([
+          'recordatorio.id_recordatorio',
+          'recordatorio.id_arbol',
+          'recordatorio.titulo',
+          'recordatorio.descripcion',
+          'recordatorio.fecha',
+          'recordatorio.hora',
+          'recordatorio.repeticion',
+          'recordatorio.dia_repeticion',
+        ])
+        .where('recordatorio.estado = :pendiente', {
+          pendiente: ESTADO_PENDIENTE,
+        })
+        .andWhere(
+          'TIMESTAMP(recordatorio.fecha, recordatorio.hora) <= :ahora',
+          { ahora: ahoraSql },
+        )
+        .andWhere('recordatorio.id_recordatorio > :ultimoId', {
+          ultimoId: ultimoIdProcesado,
+        })
+        .orderBy('recordatorio.id_recordatorio', 'ASC')
+        .take(TAMANO_LOTE_RECORDATORIOS)
+        .getMany();
 
-      // Ignora actividades cuya fecha todavía no ha llegado.
-      if (fechaProgramadaUtc.getTime() > ahoraUtc.getTime()) {
-        continue;
+      // No quedan filas posteriores al cursor que cumplan el criterio de vencimiento.
+      if (recordatoriosVencidos.length === 0) {
+        break;
       }
 
-      // Actualiza la salud del árbol solo si aún no requiere atención.
-      if (cuidado.arbol.estado_salud !== 'requiere_atencion') {
-        // Marca el árbol para que el usuario atienda el cuidado vencido.
-        cuidado.arbol.estado_salud = 'requiere_atencion';
+      for (const recordatorio of recordatoriosVencidos) {
+        // Avanza el cursor incluso cuando otra instancia ya reclamó el registro.
+        ultimoIdProcesado = recordatorio.id_recordatorio;
+        // Reclama atómicamente cada fila antes de enviar el push para evitar duplicados
+        // si coinciden dos ejecuciones del cron o dos instancias del backend.
+        const reclamo = await this.recordatorioRepository
+          .createQueryBuilder()
+          .update(Recordatorio)
+          .set({
+            estado: ESTADO_PROCESANDO,
+            procesando_desde: ahoraUtc,
+          })
+          .where(
+            'id_recordatorio = :id AND estado = :pendiente AND TIMESTAMP(fecha, hora) <= :ahora',
+            {
+              id: recordatorio.id_recordatorio,
+              pendiente: ESTADO_PENDIENTE,
+              ahora: ahoraSql,
+            },
+          )
+          .execute();
 
-        // Persiste el nuevo estado de salud.
-        await this.arbolRepository.save(cuidado.arbol);
+        // Otra ejecución pudo reclamar o actualizar la fila después de la consulta inicial.
+        if (!reclamo.affected) {
+          continue;
+        }
+
+        try {
+          // El servicio localiza el token del propietario y envía el mensaje por Firebase.
+          await this.notificacionesService.enviarPushDeRecordatorio(
+            recordatorio.id_arbol,
+            recordatorio.id_recordatorio,
+            recordatorio.titulo,
+            recordatorio.descripcion ?? recordatorio.titulo,
+          );
+        } catch (error) {
+          // Recupera la fila para que el cron vuelva a intentar el envío en su próxima pasada.
+          try {
+            await this.recordatorioRepository.update(
+              {
+                id_recordatorio: recordatorio.id_recordatorio,
+                estado: ESTADO_PROCESANDO,
+              },
+              { estado: ESTADO_PENDIENTE, procesando_desde: null },
+            );
+          } catch (recoveryError) {
+            // El lease permite recuperar esta fila en otra ejecución aunque falle el reencolado.
+            this.logger.error(
+              `No se pudo liberar el recordatorio ${recordatorio.id_recordatorio}`,
+              recoveryError instanceof Error
+                ? recoveryError.stack
+                : String(recoveryError),
+            );
+          }
+          this.logger.error(
+            `No se pudo enviar el recordatorio ${recordatorio.id_recordatorio}; se reintentará`,
+            error instanceof Error ? error.stack : String(error),
+          );
+          continue;
+        }
+
+        const repeticion = recordatorio.repeticion.trim().toLowerCase();
+
+        // Las frecuencias soportadas calculan y persisten la próxima ocurrencia.
+        if (esRepeticionProgramada(repeticion)) {
+          const ocurrenciaActual = combineUtcDateAndTime(
+            recordatorio.fecha,
+            recordatorio.hora,
+          );
+          const diaAncla =
+            recordatorio.dia_repeticion ?? ocurrenciaActual.getUTCDate();
+          const siguienteFecha = calcularSiguienteOcurrencia(
+            ocurrenciaActual,
+            repeticion,
+            diaAncla,
+            ahoraUtc,
+          );
+
+          // El estado vuelve a pendiente para activar la ocurrencia futura.
+          await this.recordatorioRepository.update(
+            {
+              id_recordatorio: recordatorio.id_recordatorio,
+              estado: ESTADO_PROCESANDO,
+            },
+            {
+              fecha: new Date(`${toUtcDatePart(siguienteFecha)}T00:00:00.000Z`),
+              hora: toUtcTimePart(siguienteFecha),
+              dia_repeticion: repeticion === 'mensual' ? diaAncla : null,
+              estado: ESTADO_PENDIENTE,
+              procesando_desde: null,
+            },
+          );
+          continue;
+        }
+
+        // Valores desconocidos se registran y se procesan una sola vez, nunca se repiten.
+        if (repeticion !== 'ninguna') {
+          this.logger.warn(
+            `Repetición desconocida "${recordatorio.repeticion}" en el recordatorio ${recordatorio.id_recordatorio}; se tratará como única`,
+          );
+        }
+
+        // Los recordatorios únicos salen de la cola pendiente tras el intento de notificación.
+        await this.recordatorioRepository.update(
+          {
+            id_recordatorio: recordatorio.id_recordatorio,
+            estado: ESTADO_PROCESANDO,
+          },
+          { estado: ESTADO_PENDIENTE_ATENCION, procesando_desde: null },
+        );
       }
     }
   }

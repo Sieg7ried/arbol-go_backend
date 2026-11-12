@@ -1,10 +1,11 @@
-// Importa PartialType para convertir todas las propiedades en opcionales.
+// Importa PartialType para reutilizar las reglas de validación con campos opcionales.
 import { PartialType } from '@nestjs/mapped-types';
 
-// Importa el DTO que contiene las reglas de validación de creación.
+// Importa los datos validados que utilizan los servicios internos de asignación.
 import { CreateUsuarioLogroDto } from './create-usuario-logro.dto';
 
-// Define los datos opcionales permitidos para actualizar un registro.
-export class UpdateUsuarioLogroDto extends PartialType(
-  CreateUsuarioLogroDto,
-) {}
+/**
+ * Define cambios parciales usados por servicios internos para actualizar una relación.
+ * No existe una ruta HTTP de actualización en UsuarioLogroController.
+ */
+export class UpdateUsuarioLogroDto extends PartialType(CreateUsuarioLogroDto) {}

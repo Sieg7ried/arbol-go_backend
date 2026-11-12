@@ -1,11 +1,11 @@
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
   Get,
-  UseGuards,
   HttpCode,
   HttpStatus,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from '../user/dto/login.dto';
@@ -14,11 +14,11 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/get-user.decorator';
 import { AuthResponse } from './interfaces/auth-response.interface';
 import type { AuthenticatedUser } from './interfaces/authenticated-user.interface';
-import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
 
+/** Endpoints públicos de autenticación y perfil privado del usuario autenticado. */
 @Controller('auth')
 export class AuthController {
+  /** Inyecta la lógica de autenticación y lectura segura del perfil. */
   constructor(private readonly authService: AuthService) {}
 
   /**
@@ -42,13 +42,12 @@ export class AuthController {
 
   /**
    * GET /auth/profile
-   * Obtener perfil del usuario autenticado
-   * Ruta protegida con JWT
+   * Permite a cualquier usuario con un JWT válido consultar su perfil y progreso.
    */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('coordinator') // Roles permitidos para acceder a esta ruta
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@GetUser() user: AuthenticatedUser): { user: AuthenticatedUser } {
-    return { user };
+  getProfile(@GetUser() user: AuthenticatedUser) {
+    // El ID procede del JWT validado; el cliente no puede seleccionar otra cuenta.
+    return this.authService.getProfile(user.id_usuario);
   }
 }

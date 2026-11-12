@@ -1,25 +1,31 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-// Entidad Logro: catálogo de insignias de gamificación (tabla "logro")
+// Representa el catálogo de insignias de gamificación persistido en la tabla "logro".
+// El índice con nombre explícito coincide con la restricción creada por la migración.
+@Index('UQ_logro_codigo', ['codigo'], { unique: true })
 @Entity('logro')
 export class Logro {
-  // PK: id_logro
+  // Identificador numérico interno del registro.
   @PrimaryGeneratedColumn({ name: 'id_logro' })
   id: number;
 
-  // Nombre del logro
+  // Código de máquina único que mantiene estable la lógica aunque cambie el nombre visible.
+  @Column({ name: 'codigo', type: 'varchar', length: 50 })
+  codigo: string;
+
+  // Etiqueta visible que se puede cambiar o traducir sin afectar la lógica de negocio.
   @Column({ type: 'varchar', length: 100, nullable: false })
   nombre: string;
 
-  // Descripción del logro
+  // Descripción visible del logro.
   @Column({ type: 'text', nullable: false })
   descripcion: string;
 
-  // Puntos que se otorgan al obtener el logro
+  // Puntos que se otorgan cuando se registra el logro.
   @Column({ name: 'puntos_otorgados', type: 'int', nullable: false })
   puntos_otorgados: number;
 
-  // Imagen (URL o ruta) de la insignia
+  // URL o ruta de la insignia.
   @Column({ type: 'varchar', length: 255, nullable: false })
   imagen: string;
 }

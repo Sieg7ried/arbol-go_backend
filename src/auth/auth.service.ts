@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
 import { User } from '../user/entities/user.entity';
-import { LoginDto } from '../user/dto/login.dto'
+import { LoginDto } from '../user/dto/login.dto';
 import { RegisterDto } from '../user/dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { AuthResponse } from './interfaces/auth-response.interface';
@@ -58,6 +58,45 @@ export class AuthService {
     }
 
     return await this.buildAuthResponse(user);
+  }
+
+  /**
+   * Lee el perfil propio a partir de la identidad autenticada y expone el progreso vigente.
+   */
+  async getProfile(userId: number): Promise<{
+    user: Pick<
+      User,
+      | 'id'
+      | 'email'
+      | 'fullName'
+      | 'foto_perfil'
+      | 'nivel'
+      | 'experiencia'
+      | 'puntos'
+      | 'role'
+    >;
+  }> {
+    // Relee el usuario para devolver valores actuales, no un snapshot obsoleto del token.
+    const user = await this.userService.findById(userId);
+
+    // Rechaza tokens cuyo usuario ya no existe o fue desactivado tras autenticarse.
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    // Construye una respuesta permitida sin incluir contraseña ni estado interno de la cuenta.
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        foto_perfil: user.foto_perfil,
+        nivel: user.nivel,
+        experiencia: user.experiencia,
+        puntos: user.puntos,
+        role: user.role,
+      },
+    };
   }
 
   /**

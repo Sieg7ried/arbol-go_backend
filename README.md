@@ -31,6 +31,37 @@
 $ npm install
 ```
 
+## Push notifications and scheduled reminders
+
+The hourly reminder job sends Firebase Cloud Messaging pushes to the device token
+registered by each tree owner. Configure these environment variables before
+starting the application:
+
+```env
+GOOGLE_APPLICATION_CREDENTIALS=C:/secure/firebase-service-account.json
+FIREBASE_PROJECT_ID=your-firebase-project-id
+```
+
+Keep the Firebase service-account file outside the repository and restrict access
+to it. The application requires both settings at startup.
+
+Authenticated clients can register or replace their user's single device token
+with `POST /notifications/device-token` (`{ "fcmToken": "..." }`) and remove it
+with `DELETE /notifications/device-token`.
+
+The task marks overdue care as `vencido`, sets the tree to
+`requiere_atencion`, and restores it to `saludable` when its last overdue care is
+completed. Reminder repetition supports `ninguna`, `diaria`, `semanal`, and
+`mensual`; monthly reminders preserve their original day, falling back to the
+last day available in shorter months. Unknown repetition values are logged and
+processed as one-time reminders.
+
+Apply pending migrations in timestamp order before deploying this version,
+including `1794441000000-LinkCareAndReminder` and
+`1794442000000-AddPushTokensAndReminderRecurrence`. They add the care/reminder
+relationship, private token storage, recurrence anchors, and the processing
+lease used to recover reminders after an interrupted job.
+
 ## Compile and run the project
 
 ```bash
