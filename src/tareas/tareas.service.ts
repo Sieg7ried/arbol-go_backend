@@ -15,11 +15,17 @@ import {
   calcularSiguienteOcurrencia,
   esRepeticionProgramada,
 } from './repeticion.util';
+import { EstadoCuidadoEnum } from '../common/enums/estado-cuidado.enum';
+import { EstadoRecordatorioEnum } from '../common/enums/estado-recordatorio.enum';
+import { EstadoSaludEnum } from '../common/enums/estado-salud.enum';
+import { RepeticionEnum } from '../common/enums/repeticion.enum';
 
-const ESTADO_PENDIENTE = 'pendiente';
-const ESTADO_VENCIDO = 'vencido';
-const ESTADO_PENDIENTE_ATENCION = 'pendiente_atencion';
-const ESTADO_PROCESANDO = 'procesando';
+const ESTADO_CUIDADO_PENDIENTE = EstadoCuidadoEnum.PENDIENTE;
+const ESTADO_CUIDADO_VENCIDO = EstadoCuidadoEnum.VENCIDO;
+const ESTADO_RECORDATORIO_PENDIENTE = EstadoRecordatorioEnum.PENDIENTE;
+const ESTADO_RECORDATORIO_PENDIENTE_ATENCION =
+  EstadoRecordatorioEnum.PENDIENTE_ATENCION;
+const ESTADO_RECORDATORIO_PROCESANDO = EstadoRecordatorioEnum.PROCESANDO;
 const MINUTOS_LEASE_PROCESAMIENTO = 120;
 const TAMANO_LOTE_RECORDATORIOS = 100;
 
@@ -48,11 +54,14 @@ export class TareasService {
     await this.recordatorioRepository
       .createQueryBuilder()
       .update(Recordatorio)
-      .set({ estado: ESTADO_PENDIENTE, procesando_desde: null })
+      .set({
+        estado: ESTADO_RECORDATORIO_PENDIENTE,
+        procesando_desde: null,
+      })
       .where(
         `estado = :procesando AND procesando_desde <= DATE_SUB(:ahora, INTERVAL ${MINUTOS_LEASE_PROCESAMIENTO} MINUTE)`,
         {
-          procesando: ESTADO_PROCESANDO,
+          procesando: ESTADO_RECORDATORIO_PROCESANDO,
           ahora: ahoraSql,
         },
       )
@@ -64,9 +73,9 @@ export class TareasService {
         .getRepository(Cuidado)
         .createQueryBuilder()
         .update(Cuidado)
-        .set({ estado: ESTADO_VENCIDO })
+        .set({ estado: ESTADO_CUIDADO_VENCIDO })
         .where('estado = :pendiente AND fecha_programada <= :ahora', {
-          pendiente: ESTADO_PENDIENTE,
+          pendiente: ESTADO_CUIDADO_PENDIENTE,
           ahora: ahoraSql,
         })
         .execute();
@@ -75,7 +84,12 @@ export class TareasService {
       // sin materializar entidades de cuidados ni árboles en memoria.
       await manager.query(
         'UPDATE `arbol` a INNER JOIN `cuidado` c ON c.`id_arbol` = a.`id_arbol` SET a.`estado_salud` = ? WHERE c.`estado` = ? AND c.`fecha_programada` <= ? AND a.`estado_salud` <> ?',
-        ['requiere_atencion', ESTADO_VENCIDO, ahoraSql, 'requiere_atencion'],
+        [
+          EstadoSaludEnum.REQUIERE_ATENCION,
+          ESTADO_CUIDADO_VENCIDO,
+          ahoraSql,
+          EstadoSaludEnum.REQUIERE_ATENCION,
+        ],
       );
     });
 
@@ -97,7 +111,7 @@ export class TareasService {
           'recordatorio.dia_repeticion',
         ])
         .where('recordatorio.estado = :pendiente', {
-          pendiente: ESTADO_PENDIENTE,
+          pendiente: ESTADO_RECORDATORIO_PENDIENTE,
         })
         .andWhere(
           'TIMESTAMP(recordatorio.fecha, recordatorio.hora) <= :ahora',
@@ -124,14 +138,14 @@ export class TareasService {
           .createQueryBuilder()
           .update(Recordatorio)
           .set({
-            estado: ESTADO_PROCESANDO,
+            estado: ESTADO_RECORDATORIO_PROCESANDO,
             procesando_desde: ahoraUtc,
           })
           .where(
             'id_recordatorio = :id AND estado = :pendiente AND TIMESTAMP(fecha, hora) <= :ahora',
             {
               id: recordatorio.id_recordatorio,
-              pendiente: ESTADO_PENDIENTE,
+              pendiente: ESTADO_RECORDATORIO_PENDIENTE,
               ahora: ahoraSql,
             },
           )
@@ -156,9 +170,12 @@ export class TareasService {
             await this.recordatorioRepository.update(
               {
                 id_recordatorio: recordatorio.id_recordatorio,
-                estado: ESTADO_PROCESANDO,
+                estado: ESTADO_RECORDATORIO_PROCESANDO,
               },
-              { estado: ESTADO_PENDIENTE, procesando_desde: null },
+              {
+                estado: ESTADO_RECORDATORIO_PENDIENTE,
+                procesando_desde: null,
+              },
             );
           } catch (recoveryError) {
             // El lease permite recuperar esta fila en otra ejecución aunque falle el reencolado.
@@ -176,7 +193,7 @@ export class TareasService {
           continue;
         }
 
-        const repeticion = recordatorio.repeticion.trim().toLowerCase();
+        const repeticion = recordatorio.repeticion;
 
         // Las frecuencias soportadas calculan y persisten la próxima ocurrencia.
         if (esRepeticionProgramada(repeticion)) {
@@ -197,13 +214,14 @@ export class TareasService {
           await this.recordatorioRepository.update(
             {
               id_recordatorio: recordatorio.id_recordatorio,
-              estado: ESTADO_PROCESANDO,
+              estado: ESTADO_RECORDATORIO_PROCESANDO,
             },
             {
               fecha: new Date(`${toUtcDatePart(siguienteFecha)}T00:00:00.000Z`),
               hora: toUtcTimePart(siguienteFecha),
-              dia_repeticion: repeticion === 'mensual' ? diaAncla : null,
-              estado: ESTADO_PENDIENTE,
+              dia_repeticion:
+                repeticion === RepeticionEnum.MENSUAL ? diaAncla : null,
+              estado: ESTADO_RECORDATORIO_PENDIENTE,
               procesando_desde: null,
             },
           );
@@ -211,7 +229,7 @@ export class TareasService {
         }
 
         // Valores desconocidos se registran y se procesan una sola vez, nunca se repiten.
-        if (repeticion !== 'ninguna') {
+        if (repeticion !== RepeticionEnum.NINGUNA) {
           this.logger.warn(
             `Repetición desconocida "${recordatorio.repeticion}" en el recordatorio ${recordatorio.id_recordatorio}; se tratará como única`,
           );
@@ -221,9 +239,12 @@ export class TareasService {
         await this.recordatorioRepository.update(
           {
             id_recordatorio: recordatorio.id_recordatorio,
-            estado: ESTADO_PROCESANDO,
+            estado: ESTADO_RECORDATORIO_PROCESANDO,
           },
-          { estado: ESTADO_PENDIENTE_ATENCION, procesando_desde: null },
+          {
+            estado: ESTADO_RECORDATORIO_PENDIENTE_ATENCION,
+            procesando_desde: null,
+          },
         );
       }
     }

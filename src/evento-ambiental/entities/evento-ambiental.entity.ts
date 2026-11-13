@@ -3,9 +3,11 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  DeleteDateColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 @Entity('evento_ambiental')
 export class EventoAmbiental {
@@ -37,4 +39,14 @@ export class EventoAmbiental {
 
   @UpdateDateColumn({ type: 'timestamp' })
   updatedAt: Date;
+
+  // Archiva el evento para preservar las inscripciones y asistencias relacionadas.
+  @Exclude()
+  @DeleteDateColumn({
+    name: 'deleted_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  deletedAt: Date | null;
 }

@@ -4,5 +4,6 @@ import { PartialType } from '@nestjs/mapped-types';
 // Importa el DTO que contiene las reglas de validación de creación.
 import { CreateCuidadoDto } from './create-cuidado.dto';
 
-// Define los datos opcionales permitidos para actualizar un cuidado.
+// PartialType conserva los validadores @IsEnum de tipo_cuidado y estado,
+// aplicándolos cuando esos campos se incluyen en una actualización.
 export class UpdateCuidadoDto extends PartialType(CreateCuidadoDto) {}

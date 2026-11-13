@@ -12,6 +12,8 @@ import { Exclude } from 'class-transformer';
 // Importa la entidad Arbol para establecer la relación con el árbol.
 import { Arbol } from '../../arbol/entities/arbol.entity';
 import { Recordatorio } from '../../recordatorio/entities/recordatorio.entity';
+import { EstadoCuidadoEnum } from '../../common/enums/estado-cuidado.enum';
+import { TipoCuidadoEnum } from '../../common/enums/tipo-cuidado.enum';
 
 // Define la tabla cuidado en la base de datos.
 @Entity('cuidado')
@@ -24,16 +26,22 @@ export class Cuidado {
   @Column({ name: 'id_arbol', nullable: false })
   id_arbol: number;
 
-  // Define la relación de muchos cuidados hacia un árbol.
-  @ManyToOne(() => Arbol, { nullable: false })
+  // El árbol se archiva conservando el historial de cuidados; RESTRICT protege
+  // esta relación ante una eliminación física externa del árbol.
+  @ManyToOne(() => Arbol, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_arbol como columna de unión con la tabla arbol.
   @JoinColumn({ name: 'id_arbol' })
   // Almacena el árbol asociado al cuidado.
   arbol: Arbol;
 
   // Almacena el tipo de actividad de cuidado.
-  @Column({ name: 'tipo_cuidado', nullable: false })
-  tipo_cuidado: string;
+  @Column({
+    name: 'tipo_cuidado',
+    type: 'enum',
+    enum: TipoCuidadoEnum,
+    default: TipoCuidadoEnum.RIEGO,
+  })
+  tipo_cuidado: TipoCuidadoEnum;
 
   // DATETIME(3) conserva la hora; el valor se escribe y lee siguiendo la convención UTC de la aplicación.
   @Column({
@@ -63,8 +71,13 @@ export class Cuidado {
   observaciones: string;
 
   // Almacena el estado actual del cuidado.
-  @Column({ name: 'estado', nullable: false })
-  estado: string;
+  @Column({
+    name: 'estado',
+    type: 'enum',
+    enum: EstadoCuidadoEnum,
+    default: EstadoCuidadoEnum.PENDIENTE,
+  })
+  estado: EstadoCuidadoEnum;
 
   // Indicador persistente que hace idempotente la recompensa incluso ante reintentos.
   // Exclude evita revelar al cliente un dato interno del proceso de gamificación.

@@ -1,4 +1,9 @@
-export type RepeticionProgramada = 'diaria' | 'semanal' | 'mensual';
+import { RepeticionEnum } from '../common/enums/repeticion.enum';
+
+export type RepeticionProgramada =
+  | RepeticionEnum.DIARIA
+  | RepeticionEnum.SEMANAL
+  | RepeticionEnum.MENSUAL;
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
@@ -7,9 +12,9 @@ export function esRepeticionProgramada(
   repeticion: string,
 ): repeticion is RepeticionProgramada {
   return (
-    repeticion === 'diaria' ||
-    repeticion === 'semanal' ||
-    repeticion === 'mensual'
+    repeticion === RepeticionEnum.DIARIA ||
+    repeticion === RepeticionEnum.SEMANAL ||
+    repeticion === RepeticionEnum.MENSUAL
   );
 }
 
@@ -20,8 +25,12 @@ export function calcularSiguienteOcurrencia(
   diaAncla: number,
   ahora: Date,
 ): Date {
-  if (repeticion === 'diaria' || repeticion === 'semanal') {
-    const intervalo = repeticion === 'diaria' ? MS_DIA : 7 * MS_DIA;
+  if (
+    repeticion === RepeticionEnum.DIARIA ||
+    repeticion === RepeticionEnum.SEMANAL
+  ) {
+    const intervalo =
+      repeticion === RepeticionEnum.DIARIA ? MS_DIA : 7 * MS_DIA;
     const periodosVencidos = Math.floor(
       (ahora.getTime() - fechaProgramada.getTime()) / intervalo,
     );

@@ -14,6 +14,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/get-user.decorator';
 import { AuthResponse } from './interfaces/auth-response.interface';
 import type { AuthenticatedUser } from './interfaces/authenticated-user.interface';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 /** Endpoints públicos de autenticación y perfil privado del usuario autenticado. */
 @Controller('auth')
@@ -36,6 +37,9 @@ export class AuthController {
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  // Limita por IP los intentos de login a cinco por minuto para reducir fuerza bruta.
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
     return this.authService.login(loginDto);
   }

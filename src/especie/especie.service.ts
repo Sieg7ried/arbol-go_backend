@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Especie } from './entities/especie.entity';
 import { CreateEspecieDto } from './dto/create-especie.dto';
 import { UpdateEspecieDto } from './dto/update-especie.dto';
@@ -90,6 +90,27 @@ export class EspecieService {
    */
   async remove(id: number): Promise<void> {
     const especie: Especie = await this.findOne(id);
-    await this.especieRepository.remove(especie);
+
+    try {
+      await this.especieRepository.remove(especie);
+    } catch (error: unknown) {
+      // MySQL devuelve este código cuando un árbol todavía referencia la especie.
+      const driverError =
+        error instanceof QueryFailedError ? error.driverError : null;
+
+      if (
+        driverError !== null &&
+        typeof driverError === 'object' &&
+        'code' in driverError &&
+        driverError.code === 'ER_ROW_IS_REFERENCED_2'
+      ) {
+        throw new ConflictException(
+          'No se puede eliminar la especie porque todavía tiene árboles asociados.',
+        );
+      }
+
+      // No convierte fallos ajenos a la integridad referencial en conflictos.
+      throw error;
+    }
   }
 }

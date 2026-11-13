@@ -1,6 +1,7 @@
 // Importa los validadores necesarios para comprobar los datos recibidos.
 import {
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,6 +9,8 @@ import {
   Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EstadoCuidadoEnum } from '../../common/enums/estado-cuidado.enum';
+import { TipoCuidadoEnum } from '../../common/enums/tipo-cuidado.enum';
 
 // Define los datos necesarios para registrar un cuidado.
 export class CreateCuidadoDto {
@@ -18,10 +21,15 @@ export class CreateCuidadoDto {
   id_arbol: number;
 
   // Valida el tipo de actividad de cuidado.
-  @IsString({ message: 'tipo_cuidado debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'tipo_cuidado es obligatorio' })
-  @ApiProperty({ example: 'Riego' })
-  tipo_cuidado: string;
+  // IsEnum impide persistir categorías desconocidas para la lógica de cuidados.
+  @IsEnum(TipoCuidadoEnum, {
+    message: 'tipo_cuidado debe ser una categoría permitida',
+  })
+  @ApiProperty({
+    enum: TipoCuidadoEnum,
+    example: TipoCuidadoEnum.RIEGO,
+  })
+  tipo_cuidado: TipoCuidadoEnum;
 
   // Valida que la fecha programada tenga un formato válido.
   @IsDateString(
@@ -67,8 +75,13 @@ export class CreateCuidadoDto {
   observaciones?: string;
 
   // Valida el estado actual del cuidado.
-  @IsString({ message: 'estado debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'estado es obligatorio' })
-  @ApiProperty({ example: 'pendiente' })
-  estado: string;
+  // IsEnum garantiza que cron y gamificación reciban solo estados soportados.
+  @IsEnum(EstadoCuidadoEnum, {
+    message: 'estado debe ser un estado de cuidado permitido',
+  })
+  @ApiProperty({
+    enum: EstadoCuidadoEnum,
+    example: EstadoCuidadoEnum.PENDIENTE,
+  })
+  estado: EstadoCuidadoEnum;
 }

@@ -26,10 +26,13 @@ export class UserService {
    * Encripta la contraseña antes de guardarla
    */
   async create(createUserDto: CreateUserDto): Promise<User> {
-    // Verificar si el email ya existe
-    const emailTaken: boolean = await this.userRepository.existsBy({
-      email: createUserDto.email,
-    });
+    // Include archived accounts because the database unique constraint still
+    // reserves their email even though normal TypeORM queries hide them.
+    const emailTaken: boolean = await this.userRepository
+      .createQueryBuilder('user')
+      .withDeleted()
+      .where('user.email = :email', { email: createUserDto.email })
+      .getExists();
 
     if (emailTaken) {
       throw new ConflictException('El email ya está registrado');
@@ -108,9 +111,13 @@ export class UserService {
 
     // Si se cambia el email, verificar que no pertenezca a otro usuario
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const emailTaken: boolean = await this.userRepository.existsBy({
-        email: updateUserDto.email,
-      });
+      // Include archived accounts so a unique-index violation is returned as 409.
+      const emailTaken: boolean = await this.userRepository
+        .createQueryBuilder('user')
+        .withDeleted()
+        .where('user.email = :email', { email: updateUserDto.email })
+        .andWhere('user.id <> :id', { id })
+        .getExists();
       if (emailTaken) {
         throw new ConflictException('El email ya está registrado');
       }
@@ -130,11 +137,12 @@ export class UserService {
     return await this.userRepository.save(user);
   }
 
-  /**
-   * Eliminar un usuario (borrado físico del registro)
-   */
+  /** Archiva una cuenta para conservar sus relaciones y la historia de autoría. */
   async remove(id: number): Promise<void> {
     const user: User = await this.findOne(id);
-    await this.userRepository.remove(user);
+
+    // Impide nuevos accesos y marca deleted_at; las relaciones permanecen válidas.
+    user.isActive = false;
+    await this.userRepository.softRemove(user);
   }
 }

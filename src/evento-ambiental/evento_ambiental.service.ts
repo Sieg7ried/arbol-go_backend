@@ -59,6 +59,8 @@ export class EventoAmbientalService {
 
   async remove(id: number): Promise<void> {
     const evento: EventoAmbiental = await this.findOne(id);
-    await this.eventoRepository.remove(evento);
+
+    // Archiva el evento para conservar las inscripciones y asistencias históricas.
+    await this.eventoRepository.softRemove(evento);
   }
 }

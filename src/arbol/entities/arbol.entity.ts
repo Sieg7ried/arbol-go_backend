@@ -2,11 +2,14 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
+import { EstadoSaludEnum } from '../../common/enums/estado-salud.enum';
 
 // Importa la entidad Especie para establecer la relación con el árbol.
 import { Especie } from '../../especie/entities/especie.entity';
@@ -21,15 +24,16 @@ export class Arbol {
   @PrimaryGeneratedColumn({ name: 'id_arbol' })
   id_arbol: number;
 
-  // Define la relación de muchos árboles hacia un usuario.
-  @ManyToOne(() => User, { nullable: false })
+  // La cuenta se archiva para conservar su autoría; RESTRICT evita que una
+  // eliminación física externa deje árboles sin un propietario válido.
+  @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_usuario como columna de unión con la tabla de usuarios.
   @JoinColumn({ name: 'id_usuario' })
   // Almacena el usuario propietario del árbol.
   usuario: User;
 
-  // Define la relación de muchos árboles hacia una especie.
-  @ManyToOne(() => Especie, { nullable: false })
+  // La especie es un catálogo compartido y no debe borrar ni perder árboles.
+  @ManyToOne(() => Especie, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_especie como columna de unión con la tabla de especies.
   @JoinColumn({ name: 'id_especie' })
   // Almacena la especie correspondiente al árbol.
@@ -68,8 +72,13 @@ export class Arbol {
   diametro_tronco: number;
 
   // Almacena el estado de salud actual del árbol.
-  @Column({ name: 'estado_salud', nullable: false })
-  estado_salud: string;
+  @Column({
+    name: 'estado_salud',
+    type: 'enum',
+    enum: EstadoSaludEnum,
+    default: EstadoSaludEnum.SALUDABLE,
+  })
+  estado_salud: EstadoSaludEnum;
 
   // Almacena el nivel de felicidad del árbol.
   @Column({ name: 'nivel_felicidad', nullable: false })
@@ -113,4 +122,15 @@ export class Arbol {
     type: 'timestamp',
   })
   fecha_registro: Date;
+
+  // Archiva el árbol y conserva cuidados, fotos e historial; la fecha no se expone
+  // en respuestas HTTP y TypeORM lo excluye de las consultas normales.
+  @Exclude()
+  @DeleteDateColumn({
+    name: 'deleted_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  deletedAt: Date | null;
 }

@@ -4,5 +4,6 @@ import { PartialType } from '@nestjs/mapped-types';
 // Importa el DTO que contiene las reglas de validación de creación.
 import { CreateArbolDto } from './create-arbol.dto';
 
-// Define los datos opcionales permitidos para actualizar un árbol.
+// PartialType conserva @IsEnum de CreateArbolDto y vuelve el campo opcional
+// sin perder la restricción del catálogo de estados de salud.
 export class UpdateArbolDto extends PartialType(CreateArbolDto) {}

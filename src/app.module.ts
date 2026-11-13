@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { join } from 'node:path';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { EspecieModule } from './especie/especie.module';
@@ -33,6 +34,11 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+
+    // Define el límite predeterminado que usarán las rutas protegidas por ThrottlerGuard.
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60_000, limit: 100 }],
     }),
 
     // Configuración de TypeORM con MySQL

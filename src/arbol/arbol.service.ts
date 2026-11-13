@@ -172,12 +172,12 @@ export class ArbolService {
     return await this.arbolRepository.save(arbol);
   }
 
-  // Elimina físicamente un árbol después de comprobar que existe.
+  // Archiva el árbol después de comprobar que existe.
   async remove(id: number): Promise<void> {
     // Busca el árbol que se desea eliminar.
     const arbol: Arbol = await this.findOne(id);
 
-    // Elimina el árbol de la base de datos.
-    await this.arbolRepository.remove(arbol);
+    // Conserva cuidados, fotos y crecimiento, evitando romper sus claves foráneas.
+    await this.arbolRepository.softRemove(arbol);
   }
 }

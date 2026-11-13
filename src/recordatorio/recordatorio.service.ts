@@ -31,6 +31,9 @@ import {
   toUtcDatePart,
   toUtcTimePart,
 } from '../common/fecha.util';
+import { EstadoCuidadoEnum } from '../common/enums/estado-cuidado.enum';
+import { EstadoRecordatorioEnum } from '../common/enums/estado-recordatorio.enum';
+import { RepeticionEnum } from '../common/enums/repeticion.enum';
 
 // Declara el servicio que contiene la lógica de negocio de los recordatorios.
 @Injectable()
@@ -77,7 +80,7 @@ export class RecordatorioService {
       fecha: parseUtcDate(fecha),
       // Persiste el día ancla solo para que la repetición mensual conserve su calendario.
       dia_repeticion:
-        recordatorioData.repeticion.trim().toLowerCase() === 'mensual'
+        recordatorioData.repeticion === RepeticionEnum.MENSUAL
           ? parseUtcDate(fecha).getUTCDate()
           : null,
     });
@@ -117,8 +120,8 @@ export class RecordatorioService {
         `Recordatorio automático para el cuidado ${cuidado.id_cuidado}`,
       fecha: new Date(`${toUtcDatePart(fechaProgramadaUtc)}T00:00:00.000Z`),
       hora: toUtcTimePart(fechaProgramadaUtc),
-      repeticion: 'ninguna',
-      estado: 'pendiente',
+      repeticion: RepeticionEnum.NINGUNA,
+      estado: EstadoRecordatorioEnum.PENDIENTE,
       dia_repeticion: null,
     });
 
@@ -140,7 +143,7 @@ export class RecordatorioService {
     });
 
     // Evita recordatorios activos para cuidados que ya no pueden volver a programarse.
-    const completado = cuidado.estado.trim().toLowerCase() === 'completado';
+    const completado = cuidado.estado === EstadoCuidadoEnum.COMPLETADO;
 
     // Un cuidado activo sin recordatorio (por ejemplo, tras una migración) recibe uno asociado.
     if (recordatorios.length === 0 && !completado) {
@@ -168,9 +171,9 @@ export class RecordatorioService {
 
       // Completar cancela el aviso; reprogramar uno activo lo devuelve a la cola pendiente.
       if (completado) {
-        recordatorio.estado = 'cancelado';
+        recordatorio.estado = EstadoRecordatorioEnum.CANCELADO;
       } else if (reprogramado) {
-        recordatorio.estado = 'pendiente';
+        recordatorio.estado = EstadoRecordatorioEnum.PENDIENTE;
       }
       if (completado || reprogramado) {
         recordatorio.procesando_desde = null;
@@ -185,7 +188,7 @@ export class RecordatorioService {
   async findPendingDue(now: Date): Promise<Recordatorio[]> {
     // Consulta recordatorios pendientes junto con su árbol.
     const recordatorios = await this.recordatorioRepository.find({
-      where: { estado: 'pendiente' },
+      where: { estado: EstadoRecordatorioEnum.PENDIENTE },
       relations: { arbol: true },
     });
 
@@ -205,7 +208,7 @@ export class RecordatorioService {
   // Marca un recordatorio vencido como pendiente de atención.
   async markAsDue(recordatorio: Recordatorio): Promise<Recordatorio> {
     // Cambia el estado para impedir que el cronjob lo procese nuevamente.
-    recordatorio.estado = 'pendiente_atencion';
+    recordatorio.estado = EstadoRecordatorioEnum.PENDIENTE_ATENCION;
 
     // Persiste el nuevo estado de atención.
     return await this.recordatorioRepository.save(recordatorio);
@@ -274,9 +277,9 @@ export class RecordatorioService {
     );
 
     // Recalcula el ancla si la fecha o la frecuencia mensual cambian.
-    const repeticionFinal = recordatorio.repeticion.trim().toLowerCase();
+    const repeticionFinal = recordatorio.repeticion;
     recordatorio.dia_repeticion =
-      repeticionFinal === 'mensual'
+      repeticionFinal === RepeticionEnum.MENSUAL
         ? updateRecordatorioDto.fecha !== undefined
           ? parseUtcDate(updateRecordatorioDto.fecha).getUTCDate()
           : (recordatorio.dia_repeticion ?? recordatorio.fecha.getUTCDate())

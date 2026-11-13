@@ -31,6 +31,20 @@
 $ npm install
 ```
 
+## HTTP security configuration
+
+The API uses Helmet for security headers, restricts browser CORS requests to the
+configured origins, and exposes Swagger only when `NODE_ENV` is not
+`production`. In development, CORS defaults to `http://localhost:3000` and
+`http://localhost:5173`; override this list with comma-separated origins:
+
+```env
+CORS_ORIGINS=https://app.example.com,https://admin.example.com
+```
+
+In production, `CORS_ORIGINS` is required and must contain explicit origins,
+never `*`. The login endpoint is limited to five attempts per minute per IP.
+
 ## Push notifications and scheduled reminders
 
 The hourly reminder job sends Firebase Cloud Messaging pushes to the device token
@@ -61,6 +75,20 @@ including `1794441000000-LinkCareAndReminder` and
 `1794442000000-AddPushTokensAndReminderRecurrence`. They add the care/reminder
 relationship, private token storage, recurrence anchors, and the processing
 lease used to recover reminders after an interrupted job.
+
+The migration `1794444000000-AddSoftDeleteAndCascadeComment` adds archive
+timestamps for users, trees, environmental events, and achievements, and
+cascades physical publication deletion to its comments. Their DELETE endpoints
+archive these parent records so related history remains intact. Species deletion
+returns a conflict while trees still reference the species.
+
+Archived user emails and achievement codes remain reserved by their unique
+indexes and cannot be reused.
+
+The migration `1794445000000-ConvertCareFieldsToEnums` normalizes and validates
+existing care, health, reminder-state, and recurrence values before converting
+them to strict enums. Resolve any reported unsupported values before retrying
+the migration; it does not silently map them to another category.
 
 ## Compile and run the project
 

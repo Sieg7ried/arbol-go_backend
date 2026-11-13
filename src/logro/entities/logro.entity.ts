@@ -1,4 +1,11 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  DeleteDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 // Representa el catálogo de insignias de gamificación persistido en la tabla "logro".
 // El índice con nombre explícito coincide con la restricción creada por la migración.
@@ -28,4 +35,14 @@ export class Logro {
   // URL o ruta de la insignia.
   @Column({ type: 'varchar', length: 255, nullable: false })
   imagen: string;
+
+  // Archiva el logro sin eliminar las concesiones históricas de los usuarios.
+  @Exclude()
+  @DeleteDateColumn({
+    name: 'deleted_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  deletedAt: Date | null;
 }

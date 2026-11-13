@@ -50,6 +50,8 @@ export class FotografiaController {
 
   // Atiende las solicitudes POST /fotografia para crear una fotografía.
   @Post()
+  // Paso 1: valida el JWT antes de ejecutar la subida y consumir almacenamiento.
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Subir una fotografía' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -127,7 +129,7 @@ export class FotografiaController {
       fileFilter: imageFileFilter,
     }),
   )
-  // Valida la propiedad indirecta fotografía -> árbol -> usuario.
+  // Paso 1: autentica; paso 2: verifica que el usuario sea dueño del recurso.
   @UseGuards(JwtAuthGuard, OwnershipGuard)
   @OwnsResource('fotografia')
   // Recibe el identificador y los cambios parciales de la fotografía.
@@ -146,7 +148,7 @@ export class FotografiaController {
   @ApiOperation({ summary: 'Eliminar una fotografía propia' })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiResponse({ status: 204, description: 'Fotografía eliminada.' })
-  // Impide eliminar fotografías de árboles ajenos.
+  // Paso 1: autentica; paso 2: verifica propiedad antes de permitir el borrado.
   @UseGuards(JwtAuthGuard, OwnershipGuard)
   @OwnsResource('fotografia')
   // Devuelve el estado HTTP 204 sin contenido después de eliminar.

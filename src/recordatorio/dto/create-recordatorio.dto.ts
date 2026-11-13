@@ -1,12 +1,15 @@
 // Importa los validadores necesarios para comprobar los datos recibidos.
 import {
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EstadoRecordatorioEnum } from '../../common/enums/estado-recordatorio.enum';
+import { RepeticionEnum } from '../../common/enums/repeticion.enum';
 
 // Define los datos necesarios para registrar un recordatorio.
 export class CreateRecordatorioDto {
@@ -41,14 +44,24 @@ export class CreateRecordatorioDto {
   hora: string;
 
   // Valida la configuración de repetición.
-  @IsString({ message: 'repeticion debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'repeticion es obligatoria' })
-  @ApiProperty({ example: 'ninguna' })
-  repeticion: string;
+  // IsEnum limita la frecuencia a las opciones con calendario implementado.
+  @IsEnum(RepeticionEnum, {
+    message: 'repeticion debe ser una frecuencia permitida',
+  })
+  @ApiProperty({
+    enum: RepeticionEnum,
+    example: RepeticionEnum.NINGUNA,
+  })
+  repeticion: RepeticionEnum;
 
   // Valida el estado actual del recordatorio.
-  @IsString({ message: 'estado debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'estado es obligatorio' })
-  @ApiProperty({ example: 'pendiente' })
-  estado: string;
+  // IsEnum impide saltarse estados desconocidos en la cola del cron.
+  @IsEnum(EstadoRecordatorioEnum, {
+    message: 'estado debe ser un estado de recordatorio permitido',
+  })
+  @ApiProperty({
+    enum: EstadoRecordatorioEnum,
+    example: EstadoRecordatorioEnum.PENDIENTE,
+  })
+  estado: EstadoRecordatorioEnum;
 }

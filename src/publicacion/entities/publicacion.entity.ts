@@ -21,8 +21,9 @@ export class Publicacion {
   @Column({ name: 'id_usuario', nullable: false })
   id_usuario: number;
 
-  // Define la relación de muchas publicaciones hacia un usuario.
-  @ManyToOne(() => User, { nullable: false })
+  // El usuario se archiva para conservar la autoría; RESTRICT impide
+  // eliminar físicamente una cuenta mientras esta relación exista.
+  @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_usuario como columna de unión con la tabla users.
   @JoinColumn({ name: 'id_usuario' })
   // Almacena el usuario que creó la publicación.

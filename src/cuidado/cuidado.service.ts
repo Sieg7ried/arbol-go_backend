@@ -30,6 +30,8 @@ import { RecordatorioService } from '../recordatorio/recordatorio.service';
 
 // Importa la utilidad de normalización UTC para fechas ISO recibidas.
 import { parseUtcDate } from '../common/fecha.util';
+import { EstadoCuidadoEnum } from '../common/enums/estado-cuidado.enum';
+import { EstadoSaludEnum } from '../common/enums/estado-salud.enum';
 
 // Declara el servicio que contiene la lógica de negocio de los cuidados.
 @Injectable()
@@ -161,15 +163,14 @@ export class CuidadoService {
           throw new NotFoundException(`Cuidado con ID ${id} no encontrado`);
         }
 
-        // Normaliza el estado persistido y el solicitado para evitar evadir la regla por mayúsculas.
-        const estadoActual = cuidadoPersistido.estado.trim().toLowerCase();
-        const estadoSolicitado =
-          updateCuidadoDto.estado?.trim().toLowerCase() ?? estadoActual;
+        // Los enums ya garantizan el formato canónico; compara valores sin normalizar texto.
+        const estadoActual = cuidadoPersistido.estado;
+        const estadoSolicitado = updateCuidadoDto.estado ?? estadoActual;
 
         // Una vez completado, el cuidado no puede volver a pendiente ni a ningún otro estado.
         if (
-          estadoActual === 'completado' &&
-          estadoSolicitado !== 'completado'
+          estadoActual === EstadoCuidadoEnum.COMPLETADO &&
+          estadoSolicitado !== EstadoCuidadoEnum.COMPLETADO
         ) {
           throw new ConflictException(
             'Un cuidado completado no puede cambiar a otro estado',
@@ -178,7 +179,8 @@ export class CuidadoService {
 
         // Solo una transición real desde un estado distinto puede disparar el procesamiento.
         const pasaACompletado =
-          estadoActual !== 'completado' && estadoSolicitado === 'completado';
+          estadoActual !== EstadoCuidadoEnum.COMPLETADO &&
+          estadoSolicitado === EstadoCuidadoEnum.COMPLETADO;
 
         // Copia el DTO para convertir fechas sin mutar el objeto validado original.
         const changes: Record<string, unknown> = {
@@ -278,8 +280,12 @@ export class CuidadoService {
         idCuidado: idCuidadoCompletado,
       })
       .andWhere(
-        "(cuidado.estado = 'vencido' OR (cuidado.estado = 'pendiente' AND cuidado.fecha_programada <= :ahora))",
-        { ahora: new Date() },
+        '(cuidado.estado = :estadoVencido OR (cuidado.estado = :estadoPendiente AND cuidado.fecha_programada <= :ahora))',
+        {
+          estadoVencido: EstadoCuidadoEnum.VENCIDO,
+          estadoPendiente: EstadoCuidadoEnum.PENDIENTE,
+          ahora: new Date(),
+        },
       )
       .getExists();
 
@@ -288,8 +294,11 @@ export class CuidadoService {
       await manager
         .getRepository(Arbol)
         .update(
-          { id_arbol: idArbol, estado_salud: 'requiere_atencion' },
-          { estado_salud: 'saludable' },
+          {
+            id_arbol: idArbol,
+            estado_salud: EstadoSaludEnum.REQUIERE_ATENCION,
+          },
+          { estado_salud: EstadoSaludEnum.SALUDABLE },
         );
     }
   }
@@ -299,7 +308,8 @@ export class CuidadoService {
     // Busca el cuidado que se desea eliminar.
     const cuidado: Cuidado = await this.findOne(id);
 
-    // Elimina el cuidado de la base de datos.
+    // La FK CASCADE elimina en SQL los recordatorios automáticos asociados
+    // dentro de la misma operación, sin dejar referencias huérfanas.
     await this.cuidadoRepository.remove(cuidado);
   }
 }

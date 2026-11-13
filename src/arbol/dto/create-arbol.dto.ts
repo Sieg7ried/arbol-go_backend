@@ -1,6 +1,7 @@
 // Importa validadores para comprobar los datos recibidos al crear un árbol.
 import {
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EstadoSaludEnum } from '../../common/enums/estado-salud.enum';
 
 // Define los datos necesarios para registrar un árbol.
 export class CreateArbolDto {
@@ -61,10 +63,15 @@ export class CreateArbolDto {
   diametro_tronco: number;
 
   // Valida el estado de salud del árbol.
-  @IsString({ message: 'El estado de salud debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'El estado de salud es obligatorio' })
-  @ApiProperty({ example: 'saludable' })
-  estado_salud: string;
+  // IsEnum compara contra valores canónicos y rechaza textos libres o diferencias de mayúsculas.
+  @IsEnum(EstadoSaludEnum, {
+    message: 'estado_salud debe ser un valor permitido',
+  })
+  @ApiProperty({
+    enum: EstadoSaludEnum,
+    example: EstadoSaludEnum.SALUDABLE,
+  })
+  estado_salud: EstadoSaludEnum;
 
   // Valida que el nivel de felicidad esté entre 0 y 100.
   @IsNumber({}, { message: 'El nivel de felicidad debe ser un número' })

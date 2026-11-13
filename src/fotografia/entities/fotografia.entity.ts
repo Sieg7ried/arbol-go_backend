@@ -21,8 +21,9 @@ export class Fotografia {
   @Column({ name: 'id_arbol', nullable: false })
   id_arbol: number;
 
-  // Define la relación de muchas fotografías hacia un árbol.
-  @ManyToOne(() => Arbol, { nullable: false })
+  // El árbol se archiva conservando la foto y su public_id de Cloudinary;
+  // RESTRICT evita borrar la referencia mediante un borrado físico externo.
+  @ManyToOne(() => Arbol, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_arbol como columna de unión con la tabla arbol.
   @JoinColumn({ name: 'id_arbol' })
   // Almacena el árbol asociado a la fotografía.
@@ -31,6 +32,11 @@ export class Fotografia {
   // Almacena la URL o ruta de la imagen.
   @Column({ name: 'url_imagen', nullable: false })
   url_imagen: string;
+
+  // Guarda el identificador de Cloudinary necesario para eliminar el recurso remoto.
+  // Es nullable temporalmente para admitir filas antiguas aún no reconciliadas.
+  @Column({ name: 'public_id', type: 'varchar', length: 255, nullable: true })
+  public_id: string | null;
 
   // Almacena la fecha asociada a la fotografía.
   @Column({ name: 'fecha', type: 'date', nullable: false })

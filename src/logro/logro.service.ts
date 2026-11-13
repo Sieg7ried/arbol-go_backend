@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Logro } from './entities/logro.entity';
@@ -17,6 +21,17 @@ export class LogroService {
    * Crear un nuevo logro
    */
   async create(createLogroDto: CreateLogroDto): Promise<Logro> {
+    // Archived codes still occupy the unique index and cannot be reused.
+    const codigoEnUso = await this.logroRepository
+      .createQueryBuilder('logro')
+      .withDeleted()
+      .where('logro.codigo = :codigo', { codigo: createLogroDto.codigo })
+      .getExists();
+
+    if (codigoEnUso) {
+      throw new ConflictException('El código del logro ya está registrado');
+    }
+
     const logro: Logro = this.logroRepository.create(createLogroDto);
     return await this.logroRepository.save(logro);
   }
@@ -54,11 +69,11 @@ export class LogroService {
     return await this.logroRepository.save(logro);
   }
 
-  /**
-   * Eliminar un logro (borrado físico del registro)
-   */
+  /** Archiva el logro para conservar los registros históricos de concesión. */
   async remove(id: number): Promise<void> {
     const logro: Logro = await this.findOne(id);
-    await this.logroRepository.remove(logro);
+
+    // TypeORM lo excluye de consultas normales sin invalidar usuario_logro.
+    await this.logroRepository.softRemove(logro);
   }
 }

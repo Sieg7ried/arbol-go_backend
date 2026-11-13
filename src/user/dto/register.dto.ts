@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   MinLength,
 } from 'class-validator';
 // Importa decoradores para documentar el DTO en Swagger.
@@ -25,12 +26,15 @@ export class RegisterDto {
 
   // Exige que password sea una cadena de texto.
   @IsString({ message: 'La contraseña debe ser una cadena de texto' })
-  // Exige un mínimo de seis caracteres para la contraseña.
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  // Exige al menos ocho caracteres y una combinación de letras y números.
+  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+  @Matches(/^(?=.*\p{L})(?=.*\p{N}).+$/u, {
+    message: 'La contraseña debe incluir al menos una letra y un número',
+  })
   // Exige que password no esté vacío.
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
   // Documenta la contraseña como requerida y de solo escritura en Swagger.
-  @ApiProperty({ example: 'secreto123', minLength: 6, writeOnly: true })
+  @ApiProperty({ example: 'secreto123', minLength: 8, writeOnly: true })
   password: string;
 
   // Exige que fullName sea una cadena de texto.

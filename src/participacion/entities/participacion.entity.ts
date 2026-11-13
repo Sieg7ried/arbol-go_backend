@@ -20,8 +20,8 @@ export class Participacion {
   @PrimaryColumn({ name: 'id_usuario' })
   id_usuario: number;
 
-  // Define la relación de muchos registros hacia un usuario.
-  @ManyToOne(() => User, { nullable: false })
+  // La cuenta se archiva para conservar la inscripción y asistencia.
+  @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_usuario como columna de unión con la tabla users.
   @JoinColumn({ name: 'id_usuario' })
   // Almacena el usuario que participa en el evento.
@@ -31,8 +31,8 @@ export class Participacion {
   @PrimaryColumn({ name: 'id_evento' })
   id_evento: number;
 
-  // Define la relación de muchos registros hacia un evento ambiental.
-  @ManyToOne(() => EventoAmbiental, { nullable: false })
+  // El evento se archiva para conservar la participación histórica.
+  @ManyToOne(() => EventoAmbiental, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_evento como columna de unión con la tabla evento_ambiental.
   @JoinColumn({ name: 'id_evento' })
   // Almacena el evento en el que participa el usuario.

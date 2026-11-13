@@ -10,6 +10,8 @@ import {
 // Importa la entidad Arbol para establecer la relación con el árbol.
 import { Arbol } from '../../arbol/entities/arbol.entity';
 import { Cuidado } from '../../cuidado/entities/cuidado.entity';
+import { EstadoRecordatorioEnum } from '../../common/enums/estado-recordatorio.enum';
+import { RepeticionEnum } from '../../common/enums/repeticion.enum';
 
 // Define la tabla recordatorio en la base de datos.
 @Entity('recordatorio')
@@ -22,8 +24,9 @@ export class Recordatorio {
   @Column({ name: 'id_arbol', nullable: false })
   id_arbol: number;
 
-  // Define la relación de muchos recordatorios hacia un árbol.
-  @ManyToOne(() => Arbol, { nullable: false })
+  // El árbol se archiva manteniendo sus recordatorios; RESTRICT protege la FK
+  // frente a un borrado físico externo del árbol.
+  @ManyToOne(() => Arbol, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_arbol como columna de unión con la tabla arbol.
   @JoinColumn({ name: 'id_arbol' })
   // Almacena el árbol asociado al recordatorio.
@@ -33,7 +36,8 @@ export class Recordatorio {
   @Column({ name: 'id_cuidado', type: 'int', nullable: true })
   id_cuidado: number | null;
 
-  // Muchos recordatorios pueden pertenecer a un cuidado; el borrado del cuidado los elimina en SQL.
+  // Los recordatorios generados dependen del cuidado; la FK los elimina
+  // atómicamente si el cuidado se borra físicamente.
   @ManyToOne(() => Cuidado, (cuidado) => cuidado.recordatorios, {
     nullable: true,
     onDelete: 'CASCADE',
@@ -58,12 +62,22 @@ export class Recordatorio {
   hora: string;
 
   // Almacena la configuración de repetición.
-  @Column({ name: 'repeticion', nullable: false })
-  repeticion: string;
+  @Column({
+    name: 'repeticion',
+    type: 'enum',
+    enum: RepeticionEnum,
+    default: RepeticionEnum.NINGUNA,
+  })
+  repeticion: RepeticionEnum;
 
   // Almacena el estado actual del recordatorio.
-  @Column({ name: 'estado', nullable: false })
-  estado: string;
+  @Column({
+    name: 'estado',
+    type: 'enum',
+    enum: EstadoRecordatorioEnum,
+    default: EstadoRecordatorioEnum.PENDIENTE,
+  })
+  estado: EstadoRecordatorioEnum;
 
   // Guarda el día original del mes para que las repeticiones mensuales no deriven tras febrero.
   @Column({

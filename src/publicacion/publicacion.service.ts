@@ -143,7 +143,8 @@ export class PublicacionService {
     // Busca la publicación que se desea eliminar.
     const publicacion: Publicacion = await this.findOne(id);
 
-    // Elimina la publicación de la base de datos.
+    // La FK CASCADE elimina atómicamente sus comentarios antes de que la
+    // publicación desaparezca, sin propagar un error de clave foránea.
     await this.publicacionRepository.remove(publicacion);
   }
 
@@ -172,7 +173,7 @@ export class PublicacionService {
       );
     }
 
-    // Elimina el recurso después de superar la condición de moderación.
+    // La FK CASCADE elimina también los comentarios de esta publicación reportada.
     await this.publicacionRepository.remove(publicacion);
   }
 }

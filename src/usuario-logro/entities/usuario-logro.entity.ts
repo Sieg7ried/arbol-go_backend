@@ -20,8 +20,8 @@ export class UsuarioLogro {
   @PrimaryColumn({ name: 'id_usuario' })
   id_usuario: number;
 
-  // Define la relación de muchos registros hacia un usuario.
-  @ManyToOne(() => User, { nullable: false })
+  // La cuenta se archiva y conserva el registro del logro obtenido.
+  @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_usuario como columna de unión con la tabla users.
   @JoinColumn({ name: 'id_usuario' })
   // Almacena el usuario que obtuvo el logro.
@@ -31,8 +31,8 @@ export class UsuarioLogro {
   @PrimaryColumn({ name: 'id_logro' })
   id_logro: number;
 
-  // Define la relación de muchos registros hacia un logro.
-  @ManyToOne(() => Logro, { nullable: false })
+  // El catálogo de logros se archiva para conservar las concesiones existentes.
+  @ManyToOne(() => Logro, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_logro como columna de unión con la tabla logro.
   @JoinColumn({ name: 'id_logro' })
   // Almacena el logro obtenido por el usuario.

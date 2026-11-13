@@ -14,6 +14,7 @@ import { Cuidado } from '../cuidado/entities/cuidado.entity';
 import { Logro } from '../logro/entities/logro.entity';
 import { User } from '../user/entities/user.entity';
 import { UsuarioLogro } from '../usuario-logro/entities/usuario-logro.entity';
+import { EstadoCuidadoEnum } from '../common/enums/estado-cuidado.enum';
 
 // Contiene los datos mínimos para procesar logros después de confirmar XP/puntos del cuidado.
 export interface ResultadoRecompensaCuidado {
@@ -36,9 +37,6 @@ export class GamificacionService {
 
   // Define los puntos otorgados por cada cuidado completado.
   private readonly puntosPorCuidado = 10;
-
-  // Define el estado que representa un cuidado finalizado.
-  private readonly estadoCompletado = 'completado';
 
   // Inyecta el origen de datos para aislar las asignaciones opcionales de logros.
   constructor(private readonly dataSource: DataSource) {}
@@ -65,7 +63,7 @@ export class GamificacionService {
     }
 
     // La recompensa principal solo se acredita si el estado persistido es completado.
-    if (cuidado.estado.trim().toLowerCase() !== this.estadoCompletado) {
+    if (cuidado.estado !== EstadoCuidadoEnum.COMPLETADO) {
       throw new ConflictException(
         'Solo se puede recompensar un cuidado completado',
       );
@@ -162,7 +160,7 @@ export class GamificacionService {
       .innerJoin('arbol.usuario', 'usuario')
       .where('usuario.id = :usuarioId', { usuarioId })
       .andWhere('cuidado.estado = :estado', {
-        estado: this.estadoCompletado,
+        estado: EstadoCuidadoEnum.COMPLETADO,
       })
       .getCount();
 

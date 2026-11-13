@@ -2,52 +2,81 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  const nodeEnv = process.env.NODE_ENV;
 
-  // Define la información pública y el esquema JWT del contrato OpenAPI.
-  const swaggerConfig = new DocumentBuilder()
-    // Identifica la API principal de la plataforma.
-    .setTitle('API ÁRBOL GO')
-    // Describe los módulos funcionales expuestos por el backend.
-    .setDescription(
-      'API REST para gestión de árboles, cuidados, crecimiento, fotografías, recordatorios, publicaciones y gamificación.',
-    )
-    // Establece la versión visible del contrato HTTP.
-    .setVersion('1.0')
-    // Permite probar endpoints protegidos con un token Bearer.
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-      },
-      'access-token',
-    )
-    // Finaliza la configuración del documento OpenAPI.
-    .build();
+  const configuredOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 
-  // Genera el documento usando los controladores y DTOs registrados.
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  const allowedOrigins =
+    configuredOrigins.length > 0
+      ? configuredOrigins
+      : nodeEnv === 'production'
+        ? []
+        : ['http://localhost:3000', 'http://localhost:5173'];
 
-  // Expone Swagger UI en la ruta /api.
-  SwaggerModule.setup('api', app, swaggerDocument);
+  if (allowedOrigins.includes('*')) {
+    throw new Error('CORS_ORIGINS no puede contener el wildcard "*".');
+  }
 
-  // Configurar ValidationPipe globalmente
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true, // Elimina propiedades no definidas en el DTO
-      forbidNonWhitelisted: true, // Lanza error si hay propiedades no permitidas
-      transform: true, // Transforma los datos al tipo definido en el DTO
+  if (nodeEnv === 'production' && allowedOrigins.length === 0) {
+    throw new Error(
+      'En producción debe configurarse CORS_ORIGINS con los orígenes permitidos.',
+    );
+  }
+
+  // Helmet añade cabeceras HTTP de seguridad; en desarrollo se desactiva CSP para que Swagger UI funcione.
+  app.use(
+    helmet({
+      contentSecurityPolicy: nodeEnv === 'production' ? undefined : false,
     }),
   );
 
-  // Aplicar @Exclude() de class-transformer en todas las respuestas
-  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+  // CORS permite únicamente los orígenes explícitos; producción requiere CORS_ORIGINS y nunca acepta "*".
+  app.enableCors({
+    origin: allowedOrigins,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
 
-  // Habilitar CORS (opcional, para desarrollo con frontend)
-  app.enableCors();
+  // Solo crea y expone la documentación OpenAPI fuera de producción.
+  if (nodeEnv !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('API ÁRBOL GO')
+      .setDescription(
+        'API REST para gestión de árboles, cuidados, crecimiento, fotografías, recordatorios, publicaciones y gamificación.',
+      )
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+        'access-token',
+      )
+      .build();
+
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api', app, swaggerDocument);
+  }
+
+  // Valida y transforma todos los cuerpos; rechaza propiedades no declaradas en cada DTO.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  // Aplica las reglas de serialización (por ejemplo, @Exclude()) a las respuestas HTTP.
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   const port: number = Number(process.env.PORT ?? 3000);
   await app.listen(port);

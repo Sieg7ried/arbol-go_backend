@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
   MinLength,
 } from 'class-validator';
@@ -16,11 +17,14 @@ export class CreateUserDto {
   @ApiProperty({ example: 'usuario@arbolgo.com' })
   email: string;
 
-  // Validación de contraseña con mínimo 6 caracteres
+  // Exige al menos ocho caracteres y una combinación de letras y números.
   @IsString({ message: 'La contraseña debe ser una cadena de texto' })
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+  @Matches(/^(?=.*\p{L})(?=.*\p{N}).+$/u, {
+    message: 'La contraseña debe incluir al menos una letra y un número',
+  })
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  @ApiProperty({ example: 'secreto123', minLength: 6, writeOnly: true })
+  @ApiProperty({ example: 'secreto123', minLength: 8, writeOnly: true })
   password: string;
 
   // Validación de nombre completo

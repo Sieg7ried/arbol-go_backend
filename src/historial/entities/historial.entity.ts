@@ -21,8 +21,9 @@ export class Historial {
   @Column({ name: 'id_arbol', nullable: false })
   id_arbol: number;
 
-  // Define la relación de muchos historiales hacia un árbol.
-  @ManyToOne(() => Arbol, { nullable: false })
+  // El árbol se archiva para preservar su historial; RESTRICT evita una
+  // eliminación física que dejaría registros históricos huérfanos.
+  @ManyToOne(() => Arbol, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_arbol como columna de unión con la tabla arbol.
   @JoinColumn({ name: 'id_arbol' })
   // Almacena el árbol asociado al registro histórico.

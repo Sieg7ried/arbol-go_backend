@@ -67,7 +67,7 @@ export class CloudinaryService {
   async uploadImage(
     file: Express.Multer.File,
     folder = 'arbol-go/fotografias',
-  ): Promise<string> {
+  ): Promise<Pick<UploadApiResponse, 'secure_url' | 'public_id'>> {
     // Rechaza requests sin archivo o con buffer vacío.
     if (!file?.buffer || file.buffer.length === 0) {
       throw new BadRequestException('La imagen es obligatoria');
@@ -92,8 +92,10 @@ export class CloudinaryService {
             }
 
             // Rechaza respuestas incompletas del proveedor externo.
-            if (!result?.secure_url) {
-              reject(new Error('Cloudinary no devolvió secure_url'));
+            if (!result?.secure_url || !result.public_id) {
+              reject(
+                new Error('Cloudinary no devolvió secure_url y public_id'),
+              );
               return;
             }
 
@@ -113,7 +115,41 @@ export class CloudinaryService {
       );
     });
 
-    // Devuelve exclusivamente la URL segura persistible en la entidad.
-    return uploadResult.secure_url;
+    // Extrae y devuelve ambos datos confirmados por Cloudinary para persistirlos.
+    return {
+      secure_url: uploadResult.secure_url,
+      public_id: uploadResult.public_id,
+    };
+  }
+
+  // Elimina un recurso remoto usando el public_id almacenado en la base de datos.
+  async deleteImage(publicId: string): Promise<void> {
+    if (!publicId?.trim()) {
+      throw new BadRequestException('El public_id de Cloudinary es obligatorio');
+    }
+
+    let deletionResult: { result?: string };
+
+    try {
+      // Paso 1: llama al SDK con el public_id persistido y el tipo de recurso correcto.
+      deletionResult = await cloudinary.uploader.destroy(publicId, {
+        resource_type: 'image',
+      });
+    } catch (error: unknown) {
+      throw new InternalServerErrorException(
+        'No fue posible eliminar la imagen de Cloudinary',
+        { cause: error },
+      );
+    }
+
+    // Paso 2: "not found" ya está limpio; cualquier otro resultado inesperado se informa.
+    if (
+      deletionResult.result !== 'ok' &&
+      deletionResult.result !== 'not found'
+    ) {
+      throw new InternalServerErrorException(
+        'Cloudinary no confirmó la eliminación de la imagen',
+      );
+    }
   }
 }

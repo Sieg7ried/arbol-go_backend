@@ -3,6 +3,7 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  DeleteDateColumn,
   Index,
   UpdateDateColumn,
 } from 'typeorm';
@@ -69,6 +70,15 @@ export class User {
     select: false,
   })
   fcmToken: string | null;
+
+  /** Archiva la cuenta sin romper FKs ni borrar la autoría de su contenido. */
+  @DeleteDateColumn({
+    name: 'deleted_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  deletedAt: Date | null;
 
   /** Fecha interna de creación: se excluye por minimización de datos expuestos. */
   @CreateDateColumn()

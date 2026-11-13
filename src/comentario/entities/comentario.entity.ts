@@ -24,8 +24,8 @@ export class Comentario {
   @Column({ name: 'id_usuario', nullable: false })
   id_usuario: number;
 
-  // Define la relación de muchos comentarios hacia un usuario.
-  @ManyToOne(() => User, { nullable: false })
+  // El usuario se archiva para conservar la autoría del comentario.
+  @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
   // Usa id_usuario como columna de unión con la tabla users.
   @JoinColumn({ name: 'id_usuario' })
   // Almacena el usuario que escribió el comentario.
@@ -35,8 +35,9 @@ export class Comentario {
   @Column({ name: 'id_publicacion', nullable: false })
   id_publicacion: number;
 
-  // Define la relación de muchos comentarios hacia una publicación.
-  @ManyToOne(() => Publicacion, { nullable: false })
+  // El comentario depende de la publicación; al borrar físicamente la
+  // publicación, SQL elimina sus comentarios en la misma operación.
+  @ManyToOne(() => Publicacion, { nullable: false, onDelete: 'CASCADE' })
   // Usa id_publicacion como columna de unión con la tabla publicacion.
   @JoinColumn({ name: 'id_publicacion' })
   // Almacena la publicación comentada.

@@ -1,5 +1,6 @@
 // Importa la excepción utilizada cuando no se encuentra un registro.
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -61,8 +62,8 @@ export class FotografiaService {
       );
     }
 
-    // Espera la subida antes de crear la entidad para evitar URLs inválidas.
-    const imageUrl = await this.cloudinaryService.uploadImage(file);
+    // Obtiene URL y public_id de la respuesta de subida del SDK.
+    const uploadedImage = await this.cloudinaryService.uploadImage(file);
 
     // Separa la FK, la URL controlada por el cliente y la fecha.
     const {
@@ -77,7 +78,8 @@ export class FotografiaService {
       ...fotografiaData,
       id_arbol: arbol.id_arbol,
       arbol,
-      url_imagen: imageUrl,
+      url_imagen: uploadedImage.secure_url,
+      public_id: uploadedImage.public_id,
       fecha: new Date(fecha),
     });
 
@@ -140,10 +142,22 @@ export class FotografiaService {
     // Impide que el cliente sustituya una URL sin pasar por Cloudinary.
     delete changes.url_imagen;
 
-    // Sube una imagen nueva solo cuando se adjuntó un archivo.
+    let previousPublicId: string | null = null;
+
     if (file) {
-      // Espera la promesa externa antes de persistir la nueva URL.
-      changes.url_imagen = await this.cloudinaryService.uploadImage(file);
+      // Impide reemplazar una fila antigua si no hay public_id con el que limpiar la imagen previa.
+      if (!fotografia.public_id) {
+        throw new ConflictException(
+          'La fotografía no tiene public_id de Cloudinary; debe reconciliarse antes de reemplazarla',
+        );
+      }
+
+      previousPublicId = fotografia.public_id;
+
+      // Extrae el nuevo public_id y URL de la respuesta del SDK.
+      const uploadedImage = await this.cloudinaryService.uploadImage(file);
+      changes.url_imagen = uploadedImage.secure_url;
+      changes.public_id = uploadedImage.public_id;
     }
 
     // Convierte la fecha recibida a una instancia de Date.
@@ -157,14 +171,31 @@ export class FotografiaService {
       changes as Partial<Fotografia>,
     );
 
-    // Guarda y devuelve la fotografía actualizada.
-    return await this.fotografiaRepository.save(fotografia);
+    // Primero persiste la nueva referencia para no dejar la fila apuntando a una imagen borrada.
+    const updatedFotografia =
+      await this.fotografiaRepository.save(fotografia);
+
+    if (previousPublicId) {
+      // Limpia la imagen anterior en Cloudinary después de confirmar el reemplazo en la BD.
+      await this.cloudinaryService.deleteImage(previousPublicId);
+    }
+
+    return updatedFotografia;
   }
 
   // Elimina físicamente una fotografía después de comprobar que existe.
   async remove(id: number): Promise<void> {
     // Busca la fotografía que se desea eliminar.
     const fotografia: Fotografia = await this.findOne(id);
+
+    if (!fotografia.public_id) {
+      throw new ConflictException(
+        'La fotografía no tiene public_id de Cloudinary; debe reconciliarse antes de eliminarla',
+      );
+    }
+
+    // Limpia primero el recurso remoto; si Cloudinary falla, la fila sigue disponible.
+    await this.cloudinaryService.deleteImage(fotografia.public_id);
 
     // Elimina la fotografía de la base de datos.
     await this.fotografiaRepository.remove(fotografia);
