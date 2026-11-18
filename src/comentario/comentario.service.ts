@@ -20,9 +20,12 @@ import { Publicacion } from '../publicacion/entities/publicacion.entity';
 // Importa los DTO utilizados para crear y actualizar comentarios.
 import { CreateComentarioDto } from './dto/create-comentario.dto';
 import { UpdateComentarioDto } from './dto/update-comentario.dto';
+import { CreateReporteDto } from '../reporte/dto/create-reporte.dto';
 
 // Importa la entidad principal del módulo.
 import { Comentario } from './entities/comentario.entity';
+import { Reporte } from '../reporte/entities/reporte.entity';
+import { ReporteService } from '../reporte/reporte.service';
 
 // Declara el servicio que contiene la lógica de negocio de los comentarios.
 @Injectable()
@@ -41,6 +44,9 @@ export class ComentarioService {
     // Inyecta el repositorio de publicaciones.
     @InjectRepository(Publicacion)
     private readonly publicacionRepository: Repository<Publicacion>,
+
+    // Inyecta el servicio común que registra reportes y aplica el umbral atómicamente.
+    private readonly reporteService: ReporteService,
   ) {}
 
   // Crea un comentario después de validar sus relaciones.
@@ -70,11 +76,11 @@ export class ComentarioService {
       );
     }
 
-    // Separa las claves foráneas y la fecha para asignarlas correctamente.
+    // Separa las claves foráneas para asignar las relaciones validadas.
+    // TypeORM genera automáticamente la fecha de creación al persistir.
     const {
       id_usuario: _idUsuario,
       id_publicacion: _idPublicacion,
-      fecha,
       ...comentarioData
     } = createComentarioDto;
 
@@ -85,7 +91,6 @@ export class ComentarioService {
       usuario,
       id_publicacion: publicacion.id_publicacion,
       publicacion,
-      fecha: new Date(fecha),
     });
 
     // Guarda el comentario y devuelve el registro persistido.
@@ -94,8 +99,12 @@ export class ComentarioService {
 
   // Obtiene todos los comentarios incluyendo usuario y publicación.
   async findAll(): Promise<Comentario[]> {
-    // Consulta todos los comentarios junto con sus relaciones.
+    // Expone comentarios visibles y excluye también los de publicaciones ocultas.
     return await this.comentarioRepository.find({
+      where: {
+        estado_moderacion: 'visible',
+        publicacion: { estado_moderacion: 'visible' },
+      },
       relations: {
         usuario: true,
         publicacion: true,
@@ -105,10 +114,14 @@ export class ComentarioService {
 
   // Obtiene un comentario específico por su identificador.
   async findOne(id: number): Promise<Comentario> {
-    // Busca el comentario por su clave primaria e incluye sus relaciones.
+    // Busca solo comentarios visibles ligados a publicaciones visibles.
     const comentario: Comentario | null =
       await this.comentarioRepository.findOne({
-        where: { id_comentario: id },
+        where: {
+          id_comentario: id,
+          estado_moderacion: 'visible',
+          publicacion: { estado_moderacion: 'visible' },
+        },
         relations: {
           usuario: true,
           publicacion: true,
@@ -168,11 +181,6 @@ export class ComentarioService {
       delete changes.id_publicacion;
     }
 
-    // Convierte la fecha recibida a una instancia de Date.
-    if (updateComentarioDto.fecha !== undefined) {
-      changes.fecha = new Date(updateComentarioDto.fecha);
-    }
-
     // Aplica los cambios restantes sobre la entidad existente.
     this.comentarioRepository.merge(
       comentario,
@@ -192,28 +200,32 @@ export class ComentarioService {
     await this.comentarioRepository.remove(comentario);
   }
 
-  // Marca un comentario para que un administrador pueda revisarlo.
-  async report(id: number): Promise<Comentario> {
-    // Busca el comentario antes de modificar su estado de moderación.
-    const comentario = await this.findOne(id);
-
-    // Registra el reporte y su fecha UTC.
-    comentario.reportado = true;
-    comentario.fecha_reporte = new Date();
-
-    // Persiste el reporte manteniendo intacta la autoría.
-    return await this.comentarioRepository.save(comentario);
+  // Registra el reporte del usuario autenticado y delega el conteo transaccional.
+  async report(
+    id: number,
+    usuarioId: number,
+    dto: CreateReporteDto,
+  ): Promise<Reporte> {
+    // El servicio compartido bloquea el objetivo, impide duplicados y aplica el umbral.
+    return this.reporteService.reportarComentario(id, usuarioId, dto.motivo);
   }
 
-  // Elimina un comentario únicamente cuando existe un reporte.
+  // Permite que la moderación administrativa elimine únicamente contenido oculto.
   async removeReportedByAdmin(id: number): Promise<void> {
-    // Obtiene el comentario con sus relaciones existentes.
-    const comentario = await this.findOne(id);
+    // Incluye el comentario oculto, que no puede recuperarse mediante findOne público.
+    const comentario = await this.comentarioRepository.findOneBy({
+      id_comentario: id,
+    });
 
-    // Impide utilizar la moderación para eliminar comentarios no reportados.
-    if (!comentario.reportado) {
+    // Informa si el comentario no existe.
+    if (!comentario) {
+      throw new NotFoundException(`Comentario con ID ${id} no encontrado`);
+    }
+
+    // Impide que la ruta administrativa borre contenido que no llegó a moderación.
+    if (comentario.estado_moderacion !== 'oculto') {
       throw new ForbiddenException(
-        'Solo pueden moderarse comentarios reportados',
+        'Solo pueden eliminarse comentarios ocultos para moderación',
       );
     }
 

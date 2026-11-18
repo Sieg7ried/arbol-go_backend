@@ -15,11 +15,12 @@ import { PublicacionService } from './publicacion.service';
 
 // Importa la entidad principal de publicaciones.
 import { Publicacion } from './entities/publicacion.entity';
+import { ReporteModule } from '../reporte/reporte.module';
 
 // Declara la configuración y dependencias del módulo de publicaciones.
 @Module({
   // Registra los repositorios que serán inyectados en el servicio.
-  imports: [TypeOrmModule.forFeature([Publicacion, User])],
+  imports: [TypeOrmModule.forFeature([Publicacion, User]), ReporteModule],
 
   // Registra el controlador que expone los endpoints HTTP.
   controllers: [PublicacionController],

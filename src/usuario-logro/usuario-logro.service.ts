@@ -23,6 +23,9 @@ import { UpdateUsuarioLogroDto } from './dto/update-usuario-logro.dto';
 
 // Importa la entidad principal del módulo.
 import { UsuarioLogro } from './entities/usuario-logro.entity';
+import type { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
+import { paginateRepository } from '../common/pagination.util';
 
 // Declara el servicio que contiene la lógica de negocio de la tabla intermedia.
 @Injectable()
@@ -90,17 +93,33 @@ export class UsuarioLogroService {
       id_logro: logro.id,
       usuario,
       logro,
-      fecha_obtenido: new Date(createUsuarioLogroDto.fecha_obtenido),
     });
 
     // Guarda la relación y devuelve el registro persistido.
     return await this.usuarioLogroRepository.save(usuarioLogro);
   }
 
-  // Obtiene todas las relaciones incluyendo usuario y logro.
-  async findAll(): Promise<UsuarioLogro[]> {
-    // Consulta todos los registros junto con sus relaciones.
-    return await this.usuarioLogroRepository.find({
+  // Obtiene una página administrativa de relaciones junto con usuario y logro.
+  async findAll(
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<UsuarioLogro>> {
+    // La consulta administrativa se pagina sin restringirla a un solo usuario.
+    return paginateRepository(this.usuarioLogroRepository, pagination, {
+      relations: {
+        usuario: true,
+        logro: true,
+      },
+    });
+  }
+
+  // Obtiene paginadamente los logros concedidos al usuario autenticado.
+  async findMine(
+    usuarioId: number,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<UsuarioLogro>> {
+    // Filtra en base de datos por id_usuario antes de limitar los resultados.
+    return paginateRepository(this.usuarioLogroRepository, pagination, {
+      where: { id_usuario: usuarioId },
       relations: {
         usuario: true,
         logro: true,
@@ -196,13 +215,6 @@ export class UsuarioLogroService {
 
       // Evita enviar el identificador como cambio independiente.
       delete changes.id_logro;
-    }
-
-    // Convierte la fecha recibida a una instancia de Date.
-    if (updateUsuarioLogroDto.fecha_obtenido !== undefined) {
-      changes.fecha_obtenido = new Date(
-        updateUsuarioLogroDto.fecha_obtenido,
-      );
     }
 
     // Comprueba que la nueva combinación no duplique otro registro.

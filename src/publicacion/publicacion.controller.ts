@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -28,10 +29,17 @@ import { OwnsResource } from '../auth/decorators/owns-resource.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { CreateReporteDto } from '../reporte/dto/create-reporte.dto';
+import { Reporte } from '../reporte/entities/reporte.entity';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -59,11 +67,29 @@ export class PublicacionController {
   // Atiende las solicitudes GET /publicacion para obtener todas las publicaciones.
   @Get()
   @ApiOperation({ summary: 'Listar publicaciones' })
-  @ApiResponse({ status: 200, description: 'Lista de publicaciones.', type: Publicacion, isArray: true })
-  // Devuelve la lista completa de publicaciones.
-  findAll(): Promise<Publicacion[]> {
-    // Delega la consulta al servicio.
-    return this.publicacionService.findAll();
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página de publicaciones visibles.' })
+  // Delega los parámetros validados para limitar la cantidad de resultados devueltos.
+  findAll(
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Publicacion>> {
+    return this.publicacionService.findAll(pagination);
+  }
+
+  // Atiende GET /publicacion/me y restringe los resultados al usuario autenticado.
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Listar mis publicaciones visibles' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página de publicaciones propias visibles.' })
+  findMine(
+    @GetUser() usuario: AuthenticatedUser,
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Publicacion>> {
+    // Usa el ID verificado del JWT; el servicio también excluye publicaciones ocultas.
+    return this.publicacionService.findMine(usuario.id_usuario, pagination);
   }
 
   // Atiende las solicitudes GET /publicacion/:id para obtener una publicación.
@@ -114,12 +140,17 @@ export class PublicacionController {
   @Post(':id/report')
   @ApiOperation({ summary: 'Reportar una publicación' })
   @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 201, description: 'Publicación reportada.', type: Publicacion })
+  @ApiResponse({ status: 201, description: 'Reporte registrado.', type: Reporte })
+  @ApiResponse({ status: 409, description: 'El usuario ya reportó o el contenido está oculto.' })
   // Requiere identidad para evitar reportes anónimos no auditables.
   @UseGuards(JwtAuthGuard)
-  report(@Param('id', ParseIntPipe) id: number): Promise<Publicacion> {
-    // Marca el recurso como reportado sin eliminarlo.
-    return this.publicacionService.report(id);
+  report(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() usuario: AuthenticatedUser,
+    @Body() dto: CreateReporteDto,
+  ): Promise<Reporte> {
+    // Pasa al servicio el ID verificado por JWT, nunca uno proporcionado en el body.
+    return this.publicacionService.report(id, usuario.id_usuario, dto);
   }
 
   // Permite eliminar publicaciones reportadas de otros usuarios únicamente a administradores.

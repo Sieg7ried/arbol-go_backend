@@ -28,6 +28,10 @@ import { OwnsResource } from '../auth/decorators/owns-resource.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { CreateReporteDto } from '../reporte/dto/create-reporte.dto';
+import { Reporte } from '../reporte/entities/reporte.entity';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -114,12 +118,17 @@ export class ComentarioController {
   @Post(':id/report')
   @ApiOperation({ summary: 'Reportar un comentario' })
   @ApiParam({ name: 'id', type: Number, example: 1 })
-  @ApiResponse({ status: 201, description: 'Comentario reportado.', type: Comentario })
+  @ApiResponse({ status: 201, description: 'Reporte registrado.', type: Reporte })
+  @ApiResponse({ status: 409, description: 'El usuario ya reportó o el contenido está oculto.' })
   // Requiere autenticación para registrar quién inicia el reporte.
   @UseGuards(JwtAuthGuard)
-  report(@Param('id', ParseIntPipe) id: number): Promise<Comentario> {
-    // Marca el comentario como reportado sin modificar su autoría.
-    return this.comentarioService.report(id);
+  report(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() usuario: AuthenticatedUser,
+    @Body() dto: CreateReporteDto,
+  ): Promise<Reporte> {
+    // Pasa al servicio el ID verificado por JWT, nunca uno proporcionado en el body.
+    return this.comentarioService.report(id, usuario.id_usuario, dto);
   }
 
   // Permite a un administrador eliminar únicamente comentarios reportados.

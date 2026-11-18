@@ -1,6 +1,5 @@
 // Importa los validadores necesarios para comprobar los datos recibidos.
 import {
-  IsDateString,
   IsNotEmpty,
   IsNumber,
   IsString,
@@ -8,6 +7,7 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 // Define los datos necesarios para registrar un comentario.
+// La fecha se omite para que el cliente no pueda alterar la marca temporal del servidor.
 export class CreateComentarioDto {
   // Valida el identificador del usuario relacionado.
   @IsNumber({}, { message: 'id_usuario debe ser un número' })
@@ -27,9 +27,4 @@ export class CreateComentarioDto {
   @ApiProperty({ example: 'Excelente crecimiento.' })
   comentario: string;
 
-  // Valida que la fecha tenga un formato válido.
-  @IsDateString({}, { message: 'fecha debe tener un formato válido' })
-  @IsNotEmpty({ message: 'fecha es obligatoria' })
-  @ApiProperty({ example: '2026-11-04T00:00:00.000Z', format: 'date-time' })
-  fecha: string;
 }

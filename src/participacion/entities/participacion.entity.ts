@@ -1,6 +1,7 @@
 // Importa los decoradores necesarios para definir la entidad y sus columnas.
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -38,8 +39,8 @@ export class Participacion {
   // Almacena el evento en el que participa el usuario.
   evento: EventoAmbiental;
 
-  // Almacena la fecha en que se inscribió el usuario.
-  @Column({ name: 'fecha_inscripcion', type: 'date', nullable: false })
+  // TypeORM y MySQL registran automáticamente cuándo se creó la participación.
+  @CreateDateColumn({ name: 'fecha_inscripcion', type: 'timestamp' })
   fecha_inscripcion: Date;
 
   // Almacena si el usuario asistió al evento.

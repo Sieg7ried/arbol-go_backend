@@ -8,6 +8,9 @@ import { Repository } from 'typeorm';
 import { Logro } from './entities/logro.entity';
 import { CreateLogroDto } from './dto/create-logro.dto';
 import { UpdateLogroDto } from './dto/update-logro.dto';
+import type { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
+import { paginateRepository } from '../common/pagination.util';
 
 @Injectable()
 export class LogroService {
@@ -36,11 +39,12 @@ export class LogroService {
     return await this.logroRepository.save(logro);
   }
 
-  /**
-   * Obtener todos los logros
-   */
-  async findAll(): Promise<Logro[]> {
-    return await this.logroRepository.find();
+  // Obtiene una página del catálogo global de logros y su total.
+  async findAll(
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Logro>> {
+    // El catálogo no pertenece a un usuario; se pagina sin filtro de propiedad.
+    return paginateRepository(this.logroRepository, pagination);
   }
 
   /**

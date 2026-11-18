@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 
 // Importa el servicio que contiene la lógica de negocio.
@@ -21,6 +22,9 @@ import { UpdateHistorialDto } from './dto/update-historial.dto';
 
 // Importa la entidad utilizada como tipo de respuesta.
 import { Historial } from './entities/historial.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OwnershipGuard } from '../auth/guards/ownership.guard';
+import { OwnsResource } from '../auth/decorators/owns-resource.decorator';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -62,7 +66,10 @@ export class HistorialController {
   @ApiOperation({ summary: 'Obtener una medición' })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Medición encontrada.', type: Historial })
-  // Convierte el parámetro id a número y devuelve el historial correspondiente.
+  @ApiResponse({ status: 403, description: 'El usuario no es propietario del historial.' })
+  // Exige JWT y valida el propietario real del árbol asociado antes de revelar la medición.
+  @UseGuards(JwtAuthGuard, OwnershipGuard)
+  @OwnsResource('historial')
   findOne(@Param('id', ParseIntPipe) id: number): Promise<Historial> {
     // Delega la búsqueda al servicio.
     return this.historialService.findOne(id);
@@ -73,6 +80,10 @@ export class HistorialController {
   @ApiOperation({ summary: 'Actualizar una medición' })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Medición actualizada.', type: Historial })
+  @ApiResponse({ status: 403, description: 'El usuario no es propietario del historial.' })
+  // Valida propiedad antes de permitir cambios en la medición.
+  @UseGuards(JwtAuthGuard, OwnershipGuard)
+  @OwnsResource('historial')
   // Recibe el identificador y los cambios parciales del historial.
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -87,6 +98,10 @@ export class HistorialController {
   @ApiOperation({ summary: 'Eliminar una medición' })
   @ApiParam({ name: 'id', type: Number, example: 1 })
   @ApiResponse({ status: 204, description: 'Medición eliminada.' })
+  @ApiResponse({ status: 403, description: 'El usuario no es propietario del historial.' })
+  // Valida propiedad antes de permitir el borrado.
+  @UseGuards(JwtAuthGuard, OwnershipGuard)
+  @OwnsResource('historial')
   // Devuelve el estado HTTP 204 sin contenido después de eliminar.
   @HttpCode(HttpStatus.NO_CONTENT)
   // Recibe el identificador del historial que se eliminará.

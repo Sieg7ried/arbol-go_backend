@@ -17,9 +17,15 @@ import { User } from '../user/entities/user.entity';
 // Importa los DTO utilizados para crear y actualizar publicaciones.
 import { CreatePublicacionDto } from './dto/create-publicacion.dto';
 import { UpdatePublicacionDto } from './dto/update-publicacion.dto';
+import { CreateReporteDto } from '../reporte/dto/create-reporte.dto';
 
 // Importa la entidad principal del módulo.
 import { Publicacion } from './entities/publicacion.entity';
+import { Reporte } from '../reporte/entities/reporte.entity';
+import { ReporteService } from '../reporte/reporte.service';
+import type { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
+import { paginateRepository } from '../common/pagination.util';
 
 // Declara el servicio que contiene la lógica de negocio de las publicaciones.
 @Injectable()
@@ -33,6 +39,9 @@ export class PublicacionService {
     // Inyecta el repositorio de usuarios.
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+
+    // Inyecta el servicio común que registra reportes y aplica el umbral atómicamente.
+    private readonly reporteService: ReporteService,
   ) {}
 
   // Crea una publicación después de validar que exista el usuario relacionado.
@@ -51,29 +60,45 @@ export class PublicacionService {
       );
     }
 
-    // Separa la FK y la fecha para asignarlas con el formato correcto.
-    const {
-      id_usuario: _idUsuario,
-      fecha,
-      ...publicacionData
-    } = createPublicacionDto;
+    // Separa la FK para asignar el usuario validado; TypeORM genera la fecha.
+    const { id_usuario: _idUsuario, ...publicacionData } =
+      createPublicacionDto;
 
     // Crea una instancia de publicación con la relación validada.
     const publicacion: Publicacion = this.publicacionRepository.create({
       ...publicacionData,
       id_usuario: usuario.id,
       usuario,
-      fecha: new Date(fecha),
     });
 
     // Guarda la publicación y devuelve el registro persistido.
     return await this.publicacionRepository.save(publicacion);
   }
 
-  // Obtiene todas las publicaciones incluyendo el usuario relacionado.
-  async findAll(): Promise<Publicacion[]> {
-    // Consulta todas las publicaciones junto con su usuario.
-    return await this.publicacionRepository.find({
+  // Obtiene una página de publicaciones visibles y el total disponible.
+  async findAll(
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Publicacion>> {
+    // Conserva el filtro de moderación y aplica paginación al conjunto visible.
+    return paginateRepository(this.publicacionRepository, pagination, {
+      where: { estado_moderacion: 'visible' },
+      relations: {
+        usuario: true,
+      },
+    });
+  }
+
+  // Devuelve solo publicaciones visibles del usuario autenticado.
+  async findMine(
+    usuarioId: number,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Publicacion>> {
+    // Aplica propiedad y moderación en la consulta antes de calcular la página.
+    return paginateRepository(this.publicacionRepository, pagination, {
+      where: {
+        id_usuario: usuarioId,
+        estado_moderacion: 'visible',
+      },
       relations: {
         usuario: true,
       },
@@ -82,10 +107,10 @@ export class PublicacionService {
 
   // Obtiene una publicación específica por su identificador.
   async findOne(id: number): Promise<Publicacion> {
-    // Busca la publicación por su clave primaria e incluye el usuario relacionado.
+    // Busca únicamente publicaciones visibles para no revelar contenido oculto por ID.
     const publicacion: Publicacion | null =
       await this.publicacionRepository.findOne({
-        where: { id_publicacion: id },
+        where: { id_publicacion: id, estado_moderacion: 'visible' },
         relations: {
           usuario: true,
         },
@@ -123,11 +148,6 @@ export class PublicacionService {
       );
     }
 
-    // Convierte la fecha recibida a una instancia de Date.
-    if (updatePublicacionDto.fecha !== undefined) {
-      changes.fecha = new Date(updatePublicacionDto.fecha);
-    }
-
     // Aplica los cambios restantes sobre la entidad existente.
     this.publicacionRepository.merge(
       publicacion,
@@ -148,28 +168,32 @@ export class PublicacionService {
     await this.publicacionRepository.remove(publicacion);
   }
 
-  // Marca una publicación para que un administrador pueda revisarla.
-  async report(id: number): Promise<Publicacion> {
-    // Busca la publicación antes de modificar su estado de moderación.
-    const publicacion = await this.findOne(id);
-
-    // Registra el reporte y la fecha UTC del evento.
-    publicacion.reportado = true;
-    publicacion.fecha_reporte = new Date();
-
-    // Persiste el reporte sin alterar la autoría de la publicación.
-    return await this.publicacionRepository.save(publicacion);
+  // Registra el reporte del usuario autenticado y delega el conteo transaccional.
+  async report(
+    id: number,
+    usuarioId: number,
+    dto: CreateReporteDto,
+  ): Promise<Reporte> {
+    // El servicio compartido bloquea el objetivo, impide duplicados y aplica el umbral.
+    return this.reporteService.reportarPublicacion(id, usuarioId, dto.motivo);
   }
 
-  // Elimina una publicación únicamente si fue reportada previamente.
+  // Permite que la moderación administrativa elimine únicamente contenido oculto.
   async removeReportedByAdmin(id: number): Promise<void> {
-    // Obtiene el recurso y sus relaciones mediante el método CRUD existente.
-    const publicacion = await this.findOne(id);
+    // Incluye el contenido oculto, que no puede recuperarse mediante findOne público.
+    const publicacion = await this.publicacionRepository.findOneBy({
+      id_publicacion: id,
+    });
 
-    // Impide que un administrador use la ruta de moderación como borrado general.
-    if (!publicacion.reportado) {
+    // Informa si la publicación no existe.
+    if (!publicacion) {
+      throw new NotFoundException(`Publicación con ID ${id} no encontrada`);
+    }
+
+    // Impide que la ruta administrativa borre contenido que no llegó a moderación.
+    if (publicacion.estado_moderacion !== 'oculto') {
       throw new ForbiddenException(
-        'Solo pueden moderarse publicaciones reportadas',
+        'Solo pueden eliminarse publicaciones ocultas para moderación',
       );
     }
 

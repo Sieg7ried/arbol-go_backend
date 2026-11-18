@@ -85,11 +85,11 @@ export class ParticipacionService {
       );
     }
 
-    // Separa las claves foráneas y la fecha para asignar las relaciones validadas.
+    // Separa las claves foráneas para asignar las relaciones validadas.
+    // TypeORM genera la fecha de inscripción al guardar la participación.
     const {
       id_usuario: _idUsuario,
       id_evento: _idEvento,
-      fecha_inscripcion,
       ...participacionData
     } = createParticipacionDto;
 
@@ -101,7 +101,6 @@ export class ParticipacionService {
         id_evento: evento.id,
         usuario,
         evento,
-        fecha_inscripcion: new Date(fecha_inscripcion),
       });
 
     // Guarda la participación y devuelve el registro persistido.
@@ -208,13 +207,6 @@ export class ParticipacionService {
 
       // Evita enviar el identificador como cambio independiente.
       delete changes.id_evento;
-    }
-
-    // Convierte la fecha recibida a una instancia de Date.
-    if (updateParticipacionDto.fecha_inscripcion !== undefined) {
-      changes.fecha_inscripcion = new Date(
-        updateParticipacionDto.fecha_inscripcion,
-      );
     }
 
     // Comprueba que la nueva combinación no duplique otro registro.

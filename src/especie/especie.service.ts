@@ -11,47 +11,36 @@ import { UpdateEspecieDto } from './dto/update-especie.dto';
 
 @Injectable()
 export class EspecieService {
-  // Número de rondas de encriptación de bcrypt
-  private readonly saltRounds = 10;
-
   constructor(
-    // Inyección del repositorio de Especie
+    // Inyecta el repositorio que consulta y persiste las especies.
     @InjectRepository(Especie)
     private readonly especieRepository: Repository<Especie>,
   ) {}
 
-  /**
-   * Crear una nueva especie
-   * Lanza 409 si ya existe una especie con el mismo nombre común
-   */
+  // Evita duplicar el nombre común antes de guardar una especie.
   async create(createEspecieDto: CreateEspecieDto): Promise<Especie> {
-    // Verificar si la especie ya existe
-    const especieExists: boolean = await this.especieRepository.existsBy({
+    // Busca el mismo nombre común para devolver un conflicto comprensible.
+    const existe: boolean = await this.especieRepository.existsBy({
       nombreComun: createEspecieDto.nombreComun,
     });
 
-    if (especieExists) {
+    if (existe) {
       throw new ConflictException('La especie ya está registrada');
     }
 
-    // Crear nueva instancia de especie
+    // Crea la instancia con los campos que ya validó el DTO.
     const especie: Especie = this.especieRepository.create(createEspecieDto);
 
-    // Guardar en la base de datos
+    // Persiste la especie y devuelve el registro creado.
     return await this.especieRepository.save(especie);
   }
 
-  /**
-   * Obtener todos las especies
-   */
+  // Devuelve todas las especies registradas en el catálogo.
   async findAll(): Promise<Especie[]> {
     return await this.especieRepository.find();
   }
 
-  /**
-   * Obtener una especie por ID
-   * Lanza 404 si no existe (para uso en controladores)
-   */
+  // Busca una especie por ID y devuelve 404 solo cuando no existe.
   async findOne(id: number): Promise<Especie> {
     const especie: Especie | null = await this.especieRepository.findOneBy({ id });
 
@@ -62,32 +51,20 @@ export class EspecieService {
     return especie;
   }
 
-  /**
-   * Buscar una especie por ID sin lanzar excepción
-   * Devuelve null si no existe (lo usa la estrategia JWT)
-   */
-  async findById(id: number): Promise<Especie | null> {
-    return await this.especieRepository.findOneBy({ id });
-  }
-
-  /**
-   * Actualizar una especie
-   */
+  // Aplica los campos parciales validados a una especie existente.
   async update(id: number, updateEspecieDto: UpdateEspecieDto): Promise<Especie> {
     const especie: Especie = await this.findOne(id);
 
-    // Copia de los cambios para no modificar el DTO recibido
+    // Copia los cambios para no modificar el DTO recibido.
     const changes: UpdateEspecieDto = { ...updateEspecieDto };
 
-    // Combinar los cambios con la entidad existente
+    // Fusiona los campos actualizables con la entidad encontrada.
     this.especieRepository.merge(especie, changes);
 
     return await this.especieRepository.save(especie);
   }
 
-  /**
-   * Eliminar una especie (borrado físico del registro)
-   */
+  // Elimina la especie y convierte únicamente la referencia FK conocida en 409.
   async remove(id: number): Promise<void> {
     const especie: Especie = await this.findOne(id);
 
@@ -98,6 +75,7 @@ export class EspecieService {
       const driverError =
         error instanceof QueryFailedError ? error.driverError : null;
 
+      // MySQL devuelve este código cuando un árbol todavía referencia la especie.
       if (
         driverError !== null &&
         typeof driverError === 'object' &&
@@ -109,7 +87,7 @@ export class EspecieService {
         );
       }
 
-      // No convierte fallos ajenos a la integridad referencial en conflictos.
+      // Propaga errores distintos para no ocultar fallos de base de datos.
       throw error;
     }
   }

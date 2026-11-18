@@ -1,6 +1,6 @@
 // Importa los decoradores necesarios para definir la entidad y sus columnas.
 import {
-  Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -38,7 +38,7 @@ export class UsuarioLogro {
   // Almacena el logro obtenido por el usuario.
   logro: Logro;
 
-  // Almacena la fecha en que el usuario obtuvo el logro.
-  @Column({ name: 'fecha_obtenido', type: 'date', nullable: false })
+  // TypeORM y MySQL generan automáticamente la fecha en que se concede el logro.
+  @CreateDateColumn({ name: 'fecha_obtenido', type: 'timestamp' })
   fecha_obtenido: Date;
 }

@@ -254,11 +254,10 @@ export class GamificacionService {
     usuario.puntos += logro.puntos_otorgados;
     await manager.getRepository(User).save(usuario);
 
-    // Construye la relación con la fecha de obtención actual.
+    // Construye la relación; TypeORM y MySQL asignan la fecha de obtención al insertarla.
     const usuarioLogro = manager.getRepository(UsuarioLogro).create({
       id_usuario: usuarioId,
       id_logro: logro.id,
-      fecha_obtenido: new Date(),
     });
 
     // Persiste la asignación dentro de la transacción secundaria.

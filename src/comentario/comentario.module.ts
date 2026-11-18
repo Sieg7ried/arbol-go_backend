@@ -18,11 +18,15 @@ import { ComentarioService } from './comentario.service';
 
 // Importa la entidad principal de comentarios.
 import { Comentario } from './entities/comentario.entity';
+import { ReporteModule } from '../reporte/reporte.module';
 
 // Declara la configuración y dependencias del módulo de comentarios.
 @Module({
   // Registra los repositorios necesarios para el servicio.
-  imports: [TypeOrmModule.forFeature([Comentario, User, Publicacion])],
+  imports: [
+    TypeOrmModule.forFeature([Comentario, User, Publicacion]),
+    ReporteModule,
+  ],
 
   // Registra el controlador que expone los endpoints HTTP.
   controllers: [ComentarioController],

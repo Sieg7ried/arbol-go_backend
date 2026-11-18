@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { LogroService } from './logro.service';
@@ -19,12 +20,21 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import {
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
 
 /**
  * Controla las rutas HTTP del catálogo global de logros.
  * La consulta es pública; la creación, actualización y eliminación son administrativas.
  */
 @Controller('logro')
+@ApiTags('Logros')
 export class LogroController {
   /** Servicio que ejecuta las operaciones de persistencia del catálogo. */
   constructor(private readonly logroService: LogroService) {}
@@ -40,8 +50,14 @@ export class LogroController {
 
   /** La consulta del catálogo permanece pública. */
   @Get()
-  findAll(): Promise<Logro[]> {
-    return this.logroService.findAll();
+  @ApiOperation({ summary: 'Listar el catálogo paginado de logros' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página del catálogo con total y última página.' })
+  findAll(
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Logro>> {
+    return this.logroService.findAll(pagination);
   }
 
   /** La consulta individual del catálogo permanece pública. */

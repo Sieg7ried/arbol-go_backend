@@ -1,5 +1,9 @@
-// Importa la excepción utilizada cuando no se encuentra un registro.
-import { Injectable, NotFoundException } from '@nestjs/common';
+// Importa las excepciones para recursos inexistentes y cambios no permitidos.
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 // Importa el decorador para inyectar repositorios de TypeORM.
 import { InjectRepository } from '@nestjs/typeorm';
@@ -123,8 +127,8 @@ export class HistorialService {
 
     // Comprueba si se solicitó cambiar el árbol relacionado.
     if (updateHistorialDto.id_arbol !== undefined) {
-      // Impide transferir un historial a un árbol potencialmente ajeno.
-      throw new NotFoundException(
+      // Rechaza la reasignación porque cambiar el árbol cambiaría la propiedad del historial.
+      throw new ForbiddenException(
         'No puedes cambiar el árbol asociado al historial',
       );
     }

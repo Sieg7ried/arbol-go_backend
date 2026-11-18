@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -25,10 +26,15 @@ import { Cuidado } from './entities/cuidado.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OwnershipGuard } from '../auth/guards/ownership.guard';
 import { OwnsResource } from '../auth/decorators/owns-resource.decorator';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -54,11 +60,29 @@ export class CuidadoController {
   // Atiende las solicitudes GET /cuidado para obtener todos los cuidados.
   @Get()
   @ApiOperation({ summary: 'Listar cuidados' })
-  @ApiResponse({ status: 200, description: 'Lista de cuidados.', type: Cuidado, isArray: true })
-  // Devuelve la lista completa de cuidados.
-  findAll(): Promise<Cuidado[]> {
-    // Delega la consulta al servicio.
-    return this.cuidadoService.findAll();
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página de cuidados con total y última página.' })
+  // Delega los parámetros validados al servicio para consultar una sola página.
+  findAll(
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Cuidado>> {
+    return this.cuidadoService.findAll(pagination);
+  }
+
+  // Atiende GET /cuidado/me y limita la consulta a árboles del usuario autenticado.
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Listar mis cuidados' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página de cuidados propios.' })
+  findMine(
+    @GetUser() usuario: AuthenticatedUser,
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Cuidado>> {
+    // Usa el ID firmado del JWT; el servicio filtra por propietario del árbol asociado.
+    return this.cuidadoService.findMine(usuario.id_usuario, pagination);
   }
 
   // Atiende las solicitudes GET /cuidado/:id para obtener un cuidado.

@@ -1,9 +1,11 @@
 // Importa los decoradores necesarios para definir la entidad y sus columnas.
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
@@ -12,6 +14,7 @@ import { User } from '../../user/entities/user.entity';
 
 // Importa la entidad Publicacion para establecer la relación con la publicación.
 import { Publicacion } from '../../publicacion/entities/publicacion.entity';
+import { Reporte } from '../../reporte/entities/reporte.entity';
 
 // Define la tabla comentario en la base de datos.
 @Entity('comentario')
@@ -47,15 +50,20 @@ export class Comentario {
   @Column({ name: 'comentario', type: 'text', nullable: false })
   comentario: string;
 
-  // Almacena la fecha asociada al comentario.
-  @Column({ name: 'fecha', type: 'date', nullable: false })
+  // TypeORM y MySQL generan la fecha de creación para impedir que dependa del cliente.
+  @CreateDateColumn({ name: 'fecha', type: 'timestamp' })
   fecha: Date;
 
-  // Indica si el comentario fue reportado para revisión administrativa.
-  @Column({ name: 'reportado', default: false })
-  reportado: boolean;
+  // Mantiene comentarios reportados fuera de las consultas públicas hasta su moderación.
+  @Column({
+    name: 'estado_moderacion',
+    type: 'enum',
+    enum: ['visible', 'oculto'],
+    default: 'visible',
+  })
+  estado_moderacion: 'visible' | 'oculto';
 
-  // Conserva la fecha UTC en que se recibió el reporte.
-  @Column({ name: 'fecha_reporte', type: 'datetime', nullable: true })
-  fecha_reporte: Date | null;
+  // Permite consultar los reportes que se han asociado a este comentario.
+  @OneToMany(() => Reporte, (reporte) => reporte.comentario)
+  reportes: Reporte[];
 }

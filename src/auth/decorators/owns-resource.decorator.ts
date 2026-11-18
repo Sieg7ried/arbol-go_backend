@@ -8,7 +8,8 @@ export type OwnershipResource =
   | 'fotografia'
   | 'recordatorio'
   | 'publicacion'
-  | 'comentario';
+  | 'comentario'
+  | 'historial';
 
 // Define la clave compartida entre el decorador y OwnershipGuard.
 export const OWNERSHIP_RESOURCE_KEY = 'ownership_resource';

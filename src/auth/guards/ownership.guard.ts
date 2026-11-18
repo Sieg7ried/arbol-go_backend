@@ -20,6 +20,7 @@ import { Fotografia } from '../../fotografia/entities/fotografia.entity';
 import { Recordatorio } from '../../recordatorio/entities/recordatorio.entity';
 import { Publicacion } from '../../publicacion/entities/publicacion.entity';
 import { Comentario } from '../../comentario/entities/comentario.entity';
+import { Historial } from '../../historial/entities/historial.entity';
 import {
   OWNERSHIP_RESOURCE_KEY,
   OwnershipResource,
@@ -108,6 +109,8 @@ export class OwnershipGuard implements CanActivate {
         return this.findUserRelationOwner(Publicacion, 'id_publicacion', id);
       case 'comentario':
         return this.findUserRelationOwner(Comentario, 'id_comentario', id);
+      case 'historial':
+        return this.findTreeRelationOwner(Historial, 'id_historial', id);
     }
   }
 
@@ -128,7 +131,11 @@ export class OwnershipGuard implements CanActivate {
 
   // Obtiene el propietario de recursos que pertenecen indirectamente a un árbol.
   private async findTreeRelationOwner(
-    entity: typeof Cuidado | typeof Fotografia | typeof Recordatorio,
+    entity:
+      | typeof Cuidado
+      | typeof Fotografia
+      | typeof Recordatorio
+      | typeof Historial,
     primaryKey: string,
     id: number,
   ): Promise<number | null> {

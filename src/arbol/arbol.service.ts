@@ -23,6 +23,9 @@ import { UpdateArbolDto } from './dto/update-arbol.dto';
 
 // Importa la entidad principal del módulo.
 import { Arbol } from './entities/arbol.entity';
+import type { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
+import { paginateRepository } from '../common/pagination.util';
 
 // Declara el servicio que contiene la lógica de negocio de los árboles.
 @Injectable()
@@ -87,10 +90,27 @@ export class ArbolService {
     return await this.arbolRepository.save(arbol);
   }
 
-  // Obtiene todos los árboles junto con sus relaciones de usuario y especie.
-  async findAll(): Promise<Arbol[]> {
-    // Consulta todos los árboles incluyendo usuario y especie.
-    return await this.arbolRepository.find({
+  // Obtiene una página de árboles y el total, incluyendo usuario y especie.
+  async findAll(
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Arbol>> {
+    // El helper aplica skip/take y devuelve la respuesta paginada estándar.
+    return paginateRepository(this.arbolRepository, pagination, {
+      relations: {
+        usuario: true,
+        especie: true,
+      },
+    });
+  }
+
+  // Obtiene solo los árboles relacionados al usuario autenticado, de forma paginada.
+  async findMine(
+    usuarioId: number,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Arbol>> {
+    // El filtro usa la relación de propiedad en SQL, no un ID enviado por el cliente.
+    return paginateRepository(this.arbolRepository, pagination, {
+      where: { usuario: { id: usuarioId } },
       relations: {
         usuario: true,
         especie: true,

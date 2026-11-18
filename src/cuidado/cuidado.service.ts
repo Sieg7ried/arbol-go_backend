@@ -32,6 +32,9 @@ import { RecordatorioService } from '../recordatorio/recordatorio.service';
 import { parseUtcDate } from '../common/fecha.util';
 import { EstadoCuidadoEnum } from '../common/enums/estado-cuidado.enum';
 import { EstadoSaludEnum } from '../common/enums/estado-salud.enum';
+import type { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
+import { paginateRepository } from '../common/pagination.util';
 
 // Declara el servicio que contiene la lógica de negocio de los cuidados.
 @Injectable()
@@ -100,12 +103,30 @@ export class CuidadoService {
     });
   }
 
-  // Obtiene todos los cuidados incluyendo el árbol relacionado.
-  async findAll(): Promise<Cuidado[]> {
-    // Consulta todos los cuidados junto con su árbol.
-    return await this.cuidadoRepository.find({
+  // Obtiene una página de cuidados y el total, incluyendo el árbol relacionado.
+  async findAll(
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Cuidado>> {
+    // El helper calcula skip/take y construye el objeto estándar de paginación.
+    return paginateRepository(this.cuidadoRepository, pagination, {
       relations: {
         arbol: true,
+      },
+    });
+  }
+
+  // Obtiene solo los cuidados de árboles pertenecientes al usuario autenticado.
+  async findMine(
+    usuarioId: number,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Cuidado>> {
+    // El JOIN filtra por el propietario del árbol antes de paginar los resultados.
+    return paginateRepository(this.cuidadoRepository, pagination, {
+      where: { arbol: { usuario: { id: usuarioId } } },
+      relations: {
+        arbol: {
+          usuario: true,
+        },
       },
     });
   }

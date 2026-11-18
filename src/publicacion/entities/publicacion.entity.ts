@@ -1,14 +1,17 @@
 // Importa los decoradores necesarios para definir la entidad y sus columnas.
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
 // Importa la entidad User para establecer la relación con el usuario.
 import { User } from '../../user/entities/user.entity';
+import { Reporte } from '../../reporte/entities/reporte.entity';
 
 // Define la tabla publicacion en la base de datos.
 @Entity('publicacion')
@@ -37,19 +40,24 @@ export class Publicacion {
   @Column({ name: 'descripcion', type: 'text', nullable: false })
   descripcion: string;
 
-  // Almacena la fecha asociada a la publicación.
-  @Column({ name: 'fecha', type: 'date', nullable: false })
+  // TypeORM y MySQL generan la fecha de creación para impedir que dependa del cliente.
+  @CreateDateColumn({ name: 'fecha', type: 'timestamp' })
   fecha: Date;
 
   // Almacena la URL o ruta de la imagen.
   @Column({ name: 'imagen', nullable: false })
   imagen: string;
 
-  // Indica si la publicación fue reportada y requiere moderación.
-  @Column({ name: 'reportado', default: false })
-  reportado: boolean;
+  // Mantiene contenido reportado fuera de las consultas públicas hasta que se modere.
+  @Column({
+    name: 'estado_moderacion',
+    type: 'enum',
+    enum: ['visible', 'oculto'],
+    default: 'visible',
+  })
+  estado_moderacion: 'visible' | 'oculto';
 
-  // Registra cuándo se recibió el reporte para facilitar auditoría.
-  @Column({ name: 'fecha_reporte', type: 'datetime', nullable: true })
-  fecha_reporte: Date | null;
+  // Permite consultar los reportes que se han asociado a esta publicación.
+  @OneToMany(() => Reporte, (reporte) => reporte.publicacion)
+  reportes: Reporte[];
 }

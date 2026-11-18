@@ -23,6 +23,7 @@ import { TareasModule } from './tareas/tareas.module';
 import { SecurityModule } from './security.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { ReporteModule } from './reporte/reporte.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     SecurityModule,
     CloudinaryModule,
     NotificacionesModule,
+    ReporteModule,
   ],
 })
 export class AppModule {}

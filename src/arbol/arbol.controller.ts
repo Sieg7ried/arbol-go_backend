@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -27,10 +28,13 @@ import { OwnershipGuard } from '../auth/guards/ownership.guard';
 import { OwnsResource } from '../auth/decorators/owns-resource.decorator';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -64,11 +68,30 @@ export class ArbolController {
   // Atiende las solicitudes GET /arbol para obtener todos los árboles.
   @Get()
   @ApiOperation({ summary: 'Listar árboles' })
-  @ApiResponse({ status: 200, description: 'Lista de árboles.', type: Arbol, isArray: true })
-  // Devuelve la lista completa de árboles.
-  findAll(): Promise<Arbol[]> {
-    // Delega la consulta al servicio.
-    return this.arbolService.findAll();
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página de árboles con total y última página.' })
+  // Recibe parámetros validados para no devolver todo el conjunto en una sola respuesta.
+  findAll(
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Arbol>> {
+    // Delega la consulta paginada al servicio.
+    return this.arbolService.findAll(pagination);
+  }
+
+  // Atiende GET /arbol/me y limita la consulta a los árboles del usuario autenticado.
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Listar mis árboles' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiResponse({ status: 200, description: 'Página de árboles propios.' })
+  findMine(
+    @GetUser() usuario: AuthenticatedUser,
+    @Query() pagination: PaginationDto,
+  ): Promise<PaginatedResult<Arbol>> {
+    // Obtiene el ID desde JWT y nunca acepta un propietario arbitrario del cliente.
+    return this.arbolService.findMine(usuario.id_usuario, pagination);
   }
 
   // Atiende las solicitudes GET /arbol/:id para obtener un árbol.
